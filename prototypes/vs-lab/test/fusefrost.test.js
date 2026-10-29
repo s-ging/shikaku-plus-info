@@ -301,3 +301,19 @@ test('idle tick: the clock moves without a move, so stalling stops working', () 
 	assert.ok(r.events.some((x) => x.kind === 'mineExplode'));
 	assert.equal(e.hearts, 2);
 });
+
+test('icebreaker never leaves you with no legal box (three ice on the last two boxes)', async () => {
+	const { vsBoard } = await import('../src/match.js');
+	const m = new FFMatch({ seed: 416076 });
+	m.newRound();
+	const s = m.sides[0];
+	s.boardIndex = 4;
+	s.deal(vsBoard(m.roundSeed, 4));
+	for (const r of s.puzzle.layout) if (!(r.x1 === 1 && r.y1 === 4) && !(r.x1 === 4 && r.y1 === 0)) m.act(0, { type: 'place', ax: r.x1, ay: r.y1, bx: r.x2, by: r.y2 });
+	const e = s.econ;
+	e.mines = [];
+	e.iceIncoming = [];
+	e.ice = [17, 28, 33].map((cell, i) => ({ cell, thaw: 3, seq: i, landedTick: 0 }));
+	e.checkStuckAndForceBreak(s.board(), 2);
+	assert.ok(e.hasIceFreeMove(s.board()), 'a legal box must remain');
+});

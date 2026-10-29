@@ -425,10 +425,14 @@ export class FFPlayer {
 		let budget = r.icebreakPerMove || Infinity;
 		let guard = this.ice.length + 1;
 		let passB = null;
-		while (this.ice.length && guard-- > 0 && budget-- > 0) {
+		while (this.ice.length && guard-- > 0) {
+			const softlock = !this.hasIceFreeMove(board);
+			// One cell per move, unless you'd be left with no legal box at all: then keep
+			// breaking, or the board can never tick again (the 2026-10-30 lockout: three ice
+			// on the last two boxes, one broke, two stayed).
+			if (budget-- <= 0 && !softlock) break;
 			const a = BoardCompletionSolver.analyze(board, this.iceSet(), this.rules.solverBudget);
 			if (passB === null) passB = a.solvable;
-			const softlock = !this.hasIceFreeMove(board);
 			if (!softlock && (!passB || !a.blocked.length)) break;
 			let pool = this.ice.filter((f) => a.blockingIce.has(f.cell));
 			if (!pool.length && softlock) pool = this.ice; // nothing provably blocking: free the nearest-to-thaw
