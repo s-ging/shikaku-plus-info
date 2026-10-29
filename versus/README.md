@@ -4,7 +4,7 @@ Head-to-head Shikaku+: two players race the same boards, and finishing boards se
 
 ## Status (2026-10-30)
 
-- **Rules:** settled on [Fuse & Frost](fuse-and-frost.md) on 2026-10-29.
+- **Rules:** settled on [Shikaku+ VS rules](fuse-and-frost.md) on 2026-10-29.
 - **Prototype:** playable in the browser with five bot difficulties, every rule on a slider, 40 passing tests and bot-vs-bot simulations: [prototypes/vs-lab/](../prototypes/vs-lab/). Open `prototypes/vs-lab/dist/shikaku-vs-lab.html` in a browser to play.
 - **App:** nothing in `s-ging/shikaku-plus` yet. The original Flutter Versus code (about 99% done) was lost to a drive failure in 2026 (before mid-September); it was never pushed, because pushing `master` deploys to production. See [history.md](history.md).
 - **Server:** not started. Leaning Cloudflare Durable Objects ([decision 0005](../decisions/0005-cloudflare-for-versus.md)).
@@ -21,7 +21,7 @@ Head-to-head Shikaku+: two players race the same boards, and finishing boards se
 
 ## Path to shipping
 
-1. Play-test Fuse & Frost in the lab and settle the open questions (pool freezing, mines vs ice balance).
+1. Play-test in the lab and settle the open questions (pool freezing, round length, whether ice should be sent at all).
 2. Fix readability: what each hazard means at a glance, the pitch, the first-match experience.
 3. Port the economy to Dart as `vs_economy.dart`, translated line by line from `fusefrost.js` and checked against test vectors produced by the JS version (the same way the landing page's `puzzle.js` is checked against `puzzle_codec.dart`).
 4. Add the engine seams to the game widget: refuse boxes over ice, report placements and clears to the match.

@@ -67,7 +67,7 @@ Row-level security limits players to their own rows. Cross-player reads (leaderb
 
 ## Payments
 
-- **Web and desktop:** the app opens `https://go.shikaku.plus/support` (`kSupportUrl`). The landing repo has no `/support` route or redirect file, so that link only works if a redirect exists outside the repo (Cloudflare); unverified, see [open questions](../project/open-questions.md). The landing page's own Support button goes straight to PayMongo (`https://paymongo.page/l/shikaku-plus`).
+- **Web and desktop:** the app opens `https://go.shikaku.plus/support` (`kSupportUrl`). That page was never built: payments haven't shipped, because no merchant of record would take an unregistered business (Krischan, 2026-10-30; [open questions](../project/open-questions.md#business)). The landing page's own Support button goes straight to PayMongo (`https://paymongo.page/l/shikaku-plus`).
 - **Android and iOS:** `in_app_purchase`, verified server-side as above. Product ids in `lib/iap_catalog.dart` must exist verbatim in Google Play Console and App Store Connect.
 - Store policy: mobile builds may not link out to external payment, so the Support sheet only shows the external checkout on web and desktop (`canUseExternalSupportLink`).
 

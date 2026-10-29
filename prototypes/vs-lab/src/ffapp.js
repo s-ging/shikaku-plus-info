@@ -258,6 +258,35 @@
 					c.fillText(String(v), x * k + k / 2, y * k + k / 2 + 1);
 				}
 
+			// Ice on its way: the whole board catches a chill instead of a marked cell.
+			if (e.iceIncoming.length) {
+				const soon = Math.min(...e.iceIncoming.map((w) => w.eta));
+				const near = 1 - Math.max(0, soon - 1) / Math.max(1, RULES.iceEta);
+				c.globalAlpha = 0.06 + 0.1 * near + 0.04 * (e.iceIncoming.length - 1);
+				c.fillStyle = C.ice;
+				c.fillRect(0, 0, this.S, this.S);
+				c.globalAlpha = 0.35 + 0.35 * near;
+				c.strokeStyle = C.ice;
+				c.lineWidth = Math.max(2, this.S / 120);
+				this.rr(1, 1, this.S - 2, this.S - 2, Math.max(4, k * 0.1));
+				c.stroke();
+				const flakes = 10 * e.iceIncoming.length;
+				const t = REDUCED ? 0 : now / 1000;
+				c.fillStyle = '#ffffff';
+				for (let i = 0; i < flakes; i++) {
+					const seedX = ((i * 7919) % 997) / 997;
+					const seedY = ((i * 104729) % 991) / 991;
+					const speed = 0.04 + (i % 5) * 0.012;
+					const x = (seedX * this.S + Math.sin(t * 0.8 + i) * k * 0.15 + this.S) % this.S;
+					const y = ((seedY + t * speed) % 1) * this.S;
+					c.globalAlpha = 0.35 + 0.4 * near * ((i % 3) / 2);
+					c.beginPath();
+					c.arc(x, y, Math.max(1.2, k * (0.025 + (i % 3) * 0.01)), 0, 6.283);
+					c.fill();
+				}
+				c.globalAlpha = 1;
+			}
+
 			if (this.drag) {
 				const d = this.drag;
 				const r = new Rect(d.ax, d.ay, d.bx, d.by);
@@ -350,10 +379,11 @@
 		switch (e.kind) {
 			case 'minesIncoming': return `${e.count} mine${e.count > 1 ? 's' : ''} incoming, ${e.eta} moves`;
 			case 'mineLand': return 'mine landed';
-			case 'mineExplode': return `mine exploded, ${e.hearts} heart${e.hearts === 1 ? '' : 's'} left`;
+			case 'mineExplode': return e.together > 1 ? `mine exploded with ${e.together - 1} more (one heart lost for all), ${e.hearts} left` : `mine exploded, ${e.hearts} heart${e.hearts === 1 ? '' : 's'} left`;
+			case 'iceBlocked': return 'ice dropped: two already on the way';
 			case 'rectsBlown': return `blast removed ${e.count} rectangle${e.count > 1 ? 's' : ''}`;
 			case 'defuse': return 'defused a mine';
-			case 'iceIncoming': return `ice incoming, ${e.eta} moves`;
+			case 'iceIncoming': return `a chill sets in: ice lands in ${e.eta} moves`;
 			case 'frozen': return 'a cell froze';
 			case 'thaw': return e.source === 'active' ? 'thawed ice, sent it back' : 'ice melted';
 			case 'forceBreak': return e.spills ? 'icebreaker: ice spills to next board' : 'icebreaker';
@@ -461,12 +491,13 @@
 			if (s.econ.ice.length || inc) {
 				const ic = document.createElement('span');
 				ic.className = 'icecount';
-				ic.textContent = `${t.textContent ? ' · ' : ''}Ice ${s.econ.ice.length}/${RULES.freezeOverAt}${inc ? ` (+${inc} coming)` : ''}`;
+				const soonest = inc ? Math.min(...s.econ.iceIncoming.map((w) => w.eta)) : 0;
+				ic.textContent = `${t.textContent ? ' · ' : ''}Ice ${s.econ.ice.length}/${RULES.freezeOverAt}${inc ? ` (+${inc} in ${Math.max(0, soonest)})` : ''}`;
 				el.appendChild(ic);
 			}
 		}
 		$('them-left').textContent = `Board ${them.boardIndex + 1}`;
-		$('mode-line').textContent = `6×6 · Fuse & Frost · FT${match.target}${match.rush ? ` · Rush ×${RULES.rushMultiplier}` : ''}`;
+		$('mode-line').textContent = `6×6 · Classic · FT${match.target}${match.rush ? ` · Rush ×${RULES.rushMultiplier}` : ''}`;
 	}
 	function renderTimer(now) {
 		if (!match) return;
@@ -566,6 +597,7 @@
 			{ k: 'batchSize', label: 'Batch size', min: 1, max: 6, step: 1 },
 			{ k: 'mineCap', label: 'Max on board', min: 2, max: 10, step: 1 },
 			{ k: 'mineFuse', label: 'Fuse (moves)', min: 2, max: 6, step: 1 },
+			{ k: 'maxHeartsPerMove', label: 'Hearts lost per move, max', min: 1, max: 4, step: 1 },
 			{ k: 'spreadLanding', label: 'Spread across regions', toggle: true },
 			{ k: 'clearWipesPool', label: 'Clear kills waiting mines', toggle: true },
 			{ k: 'clearWipesIncoming', label: 'Clear kills in-flight mines', toggle: true }
@@ -573,6 +605,8 @@
 		['Ice', [
 			{ k: 'perfectSendsIce', label: 'Perfect clear sends', min: 0, max: 3, step: 1 },
 			{ k: 'iceEta', label: 'Moves until landing', min: 1, max: 6, step: 1 },
+			{ k: 'maxIceIncoming', label: 'Max ice on the way', min: 1, max: 4, step: 1 },
+			{ k: 'telegraphIce', label: 'Mark the landing cell', toggle: true },
 			{ k: 'thawPoints', label: 'Thaw points', min: 2, max: 8, step: 1 },
 			{ k: 'passiveThawEvery', label: 'Passive −1 every', min: 1, max: 6, step: 1, fmt: (v) => `${v} moves` },
 			{ k: 'activeThaw', label: 'Adjacent thaw', min: 1, max: 4, step: 1 },

@@ -52,8 +52,8 @@ test('net-cancel touches only packets in flight, oldest first, never the pool', 
 	assert.equal(e.pool, 5);
 });
 
-test('ice: telegraphed target, lands after iceEta moves, never on clue cells', () => {
-	const e = p();
+test('ice: telegraphed target (toggle on), lands after iceEta moves, never on clue cells', () => {
+	const e = p({ telegraphIce: true });
 	const free = [7, 8, 9]; // caller passes non-clue, uncovered cells only
 	e.receiveIce(1, free);
 	const target = e.iceIncoming[0].target;
@@ -199,4 +199,24 @@ test('heal: at most one heal per round by default', () => {
 	u.hearts = 1;
 	for (let b = 0; b < 6; b++) u.onBoardCleared();
 	assert.equal(u.hearts, 3);
+});
+
+test('anti-burst: two mines going off on the same move cost one heart', () => {
+	const e = p();
+	e.mines = [{ cell: 0, fuse: 1 }, { cell: 10, fuse: 1 }];
+	const ev = e.tick(FREE);
+	assert.equal(kinds(ev).filter((k) => k === 'mineExplode').length, 2, 'both still blast');
+	assert.equal(e.hearts, 2);
+});
+
+test('ice: at most 2 on the way at once, and no target cell is shown by default', () => {
+	const e = p();
+	const ev = e.receiveIce(3, FREE);
+	assert.equal(e.iceIncoming.length, 2);
+	assert.ok(kinds(ev).includes('iceBlocked'));
+	assert.ok(e.iceIncoming.every((w) => w.target === -1));
+	e.tick(FREE);
+	e.tick(FREE);
+	e.tick(FREE);
+	assert.equal(e.ice.length, 2, 'lands on random free cells');
 });

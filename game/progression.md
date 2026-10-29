@@ -62,7 +62,7 @@ Backing Shikaku+ unlocks the **custom player tag** perk and a badge. Two product
 | Foundation | One-time donation, name your price | $1, $2, $5, $10, $20, $50 (₱50 to ₱2,500) | Permanent tag editing and the Foundation badge for that tier ($2 and $10 give the tier below) |
 | Supporter | Buy months | 1, 2, 3, 4, 6, 12 months ($1.99 to $15.00) | Tag editing for that many months and a Supporter badge |
 
-- **Web and desktop** pay through the external checkout: the app links to `https://go.shikaku.plus/support` (`kSupportUrl` in `lib/external_links.dart`; whether that path resolves is an [open question](../project/open-questions.md)), and the landing page's Support button goes to `https://paymongo.page/l/shikaku-plus`. There, Foundation is truly free-form.
+- **Web and desktop** pay through the external checkout: the app links to `https://go.shikaku.plus/support` (`kSupportUrl` in `lib/external_links.dart`; that page doesn't exist yet: payments never shipped, see [open questions](../project/open-questions.md#business)), and the landing page's Support button goes to `https://paymongo.page/l/shikaku-plus`. There, Foundation is truly free-form.
 - **Android and iOS** use in-app purchase. Receipts are verified server-side by the `verify_iap_purchase` edge function; the app never grants a perk itself.
 - The landing page shows a live donation total and a Foundation deadline, set to the end of August 2026 at last check.
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-29
 **Decided by:** Krischan
-**Status:** accepted
+**Status:** accepted. On 2026-10-30 Krischan dropped the name: the mode is just "Shikaku+ VS". Rule tweaks the same day: anti-burst, max 2 ice on the way, freeze-over at 3 ([rules](../versus/fuse-and-frost.md)).
 
 ## Context
 

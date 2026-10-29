@@ -80,7 +80,7 @@ Do not write passwords, API keys, service-role keys, signing keystores, or card 
 | Zen, Time Attack, Blitz, Tekazu, Daily, Help Me! | [game/modes.md](game/modes.md) |
 | Badges, stats, leaderboards, accounts, supporting | [game/progression.md](game/progression.md) |
 | What a word means (given, anchor, do-over…) | [game/glossary.md](game/glossary.md) |
-| Versus mode rules (Fuse & Frost) | [versus/fuse-and-frost.md](versus/fuse-and-frost.md) |
+| Versus mode rules (Shikaku+ VS) | [versus/fuse-and-frost.md](versus/fuse-and-frost.md) |
 | Why Versus changed from the temperature design | [versus/history.md](versus/history.md) |
 | Which repo holds what | [codebase/README.md](codebase/README.md) |
 | Which file does what in the app | [codebase/app-map.md](codebase/app-map.md) |

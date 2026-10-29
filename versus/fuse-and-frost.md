@@ -1,6 +1,8 @@
-# Fuse & Frost: the Versus rules
+# Shikaku+ VS: the rules
 
-The current ruleset for Shikaku+ Versus, decided with Krischan on 2026-10-29 ([decision 0003](../decisions/0003-fuse-and-frost.md)). It replaces the temperature economy ([history.md](history.md)). The playable reference implementation is [prototypes/vs-lab/](../prototypes/vs-lab/) (`src/fusefrost.js`, `src/ffmatch.js`); when this page and that code disagree, check the tests in `test/fusefrost.test.js` and ask.
+The mode is just called **Shikaku+ VS** (Krischan, 2026-10-30: not sold on "Fuse & Frost"; "Pro", "Ranked" or "EX" variants feel cheesy). "Fuse & Frost" survives only as the design-era name of this ruleset in older notes and file names.
+
+The current ruleset for Shikaku+ VS, decided with Krischan on 2026-10-29 ([decision 0003](../decisions/0003-fuse-and-frost.md)). It replaces the temperature economy ([history.md](history.md)). The playable reference implementation is [prototypes/vs-lab/](../prototypes/vs-lab/) (`src/fusefrost.js`, `src/ffmatch.js`); when this page and that code disagree, check the tests in `test/fusefrost.test.js` and ask.
 
 ## The pitch
 
@@ -31,7 +33,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 | Live mines on a board | At most 6; the rest wait in a pool and drop in as room frees up |
 | Fuse | 3 of your moves |
 | Defuse | Cover the mine with a placed box. No reward beyond surviving. |
-| Explosion | −1 heart, and every box touching the 3×3 blast is removed |
+| Explosion | −1 heart, and every box touching the 3×3 blast is removed. Mines that go off on the same move cost **one heart in total** (anti-burst, 2026-10-30); each still blasts. |
 | Your board clears | Its live mines and its waiting pool die with it; mines still in flight keep coming |
 
 **Net-cancel:** your attack first cancels mines still in flight to you, oldest first. It never touches the pool or mines already on your board. Once trouble has landed, you dig out of it.
@@ -41,7 +43,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 | Rule | Value |
 | --- | --- |
 | Sources | A perfect clear (no erase or overwrite on that board) sends 1 ice. Ice your opponent thaws by building comes back to you. |
-| Arrival | Telegraphed on a visible target cell (hatched, with a countdown); lands after 3 of your moves |
+| On the way | At most **2** at once; extra is dropped (2026-10-30). No landing cell is marked: the whole board catches a chill (a blue frost and drifting snow, stronger as it gets close) and the footer counts down. Lands on a random empty non-clue cell after 3 of your moves. |
 | Effect | Refuses boxes. A board cannot be finished while ice is on it. |
 | Thaw points | 4, shown as a growing dark wedge |
 | Passive thaw | −1 every 2 of your moves; sends nothing |
@@ -52,13 +54,26 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 ## Rounds and the match
 
 - 3 hearts per round.
-- **KO:** out of hearts, or 4 ice on your board at once (**freeze-over**). Ice still on its way doesn't count until it lands, and several can land on one move.
+- **KO:** out of hearts, or 3 ice on your board at once (**freeze-over**; was 4 until the ice cap, see below). Ice still on its way doesn't count until it lands, and several can land on one move.
 - A KO ends the round and **fully resets both players**, winner included, so nobody snowballs. First to 7 rounds.
 - **Heal:** 3 perfect boards in a row heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board.
-- **Rush:** after 150 moves (average of both players), every mine attack is worth 5 times as much. It guarantees every round ends.
+- **Rush:** after 100 moves (average of both players; was 150), every mine attack is worth 5 times as much. It guarantees every round ends.
 - Boards: 6×6 Classic, both players race the same seeded sequence at their own pace.
 
 ## What the bot-vs-bot simulations say
+
+### After the 2026-10-30 changes (Hard vs Hard)
+
+| Rules | Rounds that never end | KO by mines / ice | Median round | Lead swings |
+| --- | --- | --- | --- | --- |
+| Before (freeze-over 4, rush 150, no caps) | 0% | 18% / 83% | 2:35 | 8 |
+| Anti-burst only | 0% | 8% / 92% | 2:44 | 9 |
+| Ice cap of 2 only | 12% | 88% / 0% | 5:48 | 16 |
+| **Both, freeze-over 3, rush 100 (current)** | 3% | 47% / 50% | 4:53 | 16 |
+
+The anti-burst rule barely changes balance. The ice cap is what matters: with at most 2 ice on the way, nobody reached 4 ice, so ice stopped ending rounds. Lowering freeze-over to 3 brings ice back, and the mines-vs-ice split is now about even (it used to be about 75% ice). Rounds are longer with twice the back-and-forth. The bot presets were calibrated under the old rules and may need retuning.
+
+### Before the 2026-10-30 changes
 
 From `prototypes/vs-lab/test/ffsim.js` (bots at about 1.6 seconds per move that make more mistakes under pressure):
 
@@ -89,8 +104,10 @@ Each preset beats the one below about 85% of the time. A strong player at about 
 
 ## Open questions
 
+- **Sending ice:** Krischan isn't sold on ice being *sent* (from perfect clears and from thawing) yet, and nothing visibly travels from one board to the other: no projectiles. Parked as the last thing to worry about (2026-10-30).
+
 - **Pool freezing:** Krischan's original rule had a backed-up mine pool slowly freeze cells. Not built; to discuss.
-- **Mines vs ice balance:** ice may be too dominant at about 75% of KOs. Levers: the freeze-over count, thaw points, ice per perfect clear.
+- **Round length:** about 5 minutes between even players since the ice cap. Levers: rush timing, freeze-over count, ice per perfect clear.
 - **Spicy mines:** row, column or diagonal blasts as rare attacks. Version 2 content.
 - **Spread landing** (one mine per unsolved region): built as a toggle; barely changes results in the simulations.
 - **Server:** Cloudflare Durable Objects, one per match, instead of renting a Colyseus VM ([decision 0005](../decisions/0005-cloudflare-for-versus.md), proposed). The economy module is import-free so the same file can run there.

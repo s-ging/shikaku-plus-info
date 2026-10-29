@@ -34,7 +34,7 @@ Words used in the game, the code and this wiki. Player-facing copy uses the firs
 | PreVS | Badge for players registered before Versus launches. |
 | Mosaic | Retired weekly collaborative image mode. |
 | Versus, VS | Head-to-head mode in development. |
-| Fuse & Frost | The current Versus ruleset: mines (fuse) and ice (frost). |
+| Shikaku+ VS | The head-to-head mode. Its rules were designed under the working name "Fuse & Frost", now dropped. |
 | Mine | Versus: an active hazard with a fuse; cover it with a box to defuse it. |
 | Ice, frozen cell | Versus: a passive hazard that blocks a cell until it thaws. |
 | Icebreaker | Versus: the automatic break that stops ice from making a board unsolvable. |

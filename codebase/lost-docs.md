@@ -1,6 +1,6 @@
 # Docs the code cites that are not in any repo
 
-The app's code comments refer to several design documents that are not in the `s-ging/shikaku-plus` snapshot. Whether they were ever committed isn't known; they may have lived only on the drive that failed. The comments quote enough of them to rebuild the important parts. This page lists each one, where it is cited, and where its content now lives.
+The app's code comments refer to several design documents that are not in the `s-ging/shikaku-plus` snapshot. Krischan's best guess (2026-10-30): they sat outside the Flutter project folder (a parent folder, since a Flutter app lives one level down from where you start), or were git-ignored, so they were never pushed and went with the drive. The comments quote enough of them to rebuild the important parts. This page lists each one, where it is cited, and where its content now lives.
 
 | Document | Cited by | What it covered | Rebuilt in |
 | --- | --- | --- | --- |

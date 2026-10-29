@@ -2,14 +2,14 @@
 
 The wiki for **Shikaku+**, Krischan's puzzle game: how the game works, how its code is laid out, where the versus mode stands, and how an AI agent should find its way around all of it.
 
-**The short version:** Shikaku+ is a Shikaku puzzle game (every number on the grid needs its own box, exactly that many squares big) built in Flutter for Android, web and desktop. It runs offline-first, installs at about 9MB on the Play Store, and has close to 100 players with no promotion. Its social layer lets you send a half-solved board to a friend with a "Help Me!" link. A head-to-head **Versus** mode was about 99% done when a drive failure in 2026 erased it; it is being rebuilt as **Fuse & Frost**, with a playable prototype in [prototypes/vs-lab/](prototypes/vs-lab/).
+**The short version:** Shikaku+ is a Shikaku puzzle game (every number on the grid needs its own box, exactly that many squares big) built in Flutter for Android, web and desktop. It runs offline-first, installs at about 9MB on the Play Store, and has close to 100 players with no promotion. Its social layer lets you send a half-solved board to a friend with a "Help Me!" link. A head-to-head **Versus** mode was about 99% done when a drive failure in 2026 erased it; it is being rebuilt as **Shikaku+ VS**, with a playable prototype in [prototypes/vs-lab/](prototypes/vs-lab/).
 
 **Start with [AGENTS.md](AGENTS.md)**, then [project/status.md](project/status.md).
 
 | Folder | What it is |
 | --- | --- |
 | [game/](game/) | How to play: rules, rulesets, modes, progression, glossary |
-| [versus/](versus/) | Versus mode: the current Fuse & Frost rules, its history, the archived temperature design |
+| [versus/](versus/) | Versus mode: the current Shikaku+ VS rules, its history, the archived temperature design |
 | [codebase/](codebase/) | The app and landing repos: file map, puzzle engine, backend, build and release, design system |
 | [llm/](llm/) | Guide for AI agents: where to look for each task, rules that must never break, how to play a board |
 | [project/](project/) | Where things stand, the roadmap, open questions |

@@ -5,7 +5,7 @@ What Krischan has said he wants, roughly in order. Not a schedule.
 ## Near term
 
 1. **Offline mode back.** Lost with the drive; Krischan's top practical need as of 2026-10-30.
-2. **Versus: Fuse & Frost.** Play-test the lab, fix readability, port to Dart, ship. Start with a bot opponent if online play needs longer. The PreVS badge already promises it to registered players. See [versus/README.md](../versus/README.md#path-to-shipping).
+2. **Shikaku+ VS.** Play-test the lab, fix readability, port to Dart, ship. Start with a bot opponent if online play needs longer. The PreVS badge already promises it to registered players. See [versus/README.md](../versus/README.md#path-to-shipping).
 3. **Versus server on Cloudflare** rather than a rented Colyseus VM ([decision 0005](../decisions/0005-cloudflare-for-versus.md), proposed).
 
 ## Later, as stated

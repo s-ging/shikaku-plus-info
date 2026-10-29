@@ -12,7 +12,7 @@ import { BoardCompletionSolver, EconRng } from './economy.js';
 
 export const FF_RULES = {
 	hearts: 3,
-	freezeOverAt: 4,
+	freezeOverAt: 3, // was 4; lowered when incoming ice was capped at 2 (2026-10-30)
 
 	// Attack
 	clearSend: 4,
@@ -24,11 +24,14 @@ export const FF_RULES = {
 	batchSize: 4, // most that land in one move
 	mineCap: 6, // live mines on board; the rest wait in the pool
 	mineFuse: 3,
+	maxHeartsPerMove: 1, // mines going off on the same move cost at most this many hearts (anti-burst)
 	spreadLanding: false, // land one per unsolved region (experiment)
 	blastRadius: 1, // 3×3
 
 	// Ice
 	iceEta: 3,
+	maxIceIncoming: 2, // at most this much ice on its way at once; extra is dropped
+	telegraphIce: false, // false: no target cell shown; the board just catches a chill until it lands
 	thawPoints: 4,
 	passiveThawEvery: 2, // −1 every 2 moves (0.5 per move)
 	activeThaw: 2, // a placed rect sharing an edge
@@ -38,7 +41,7 @@ export const FF_RULES = {
 	icebreakSpills: true, // broken ice isn't destroyed: it returns on your next board
 
 	// Rush: once the round runs long, every mine attack is multiplied
-	rushAfter: 150, // match moves (average of both players); 0 = off
+	rushAfter: 100, // match moves (average of both players); 0 = off
 	rushMultiplier: 5,
 
 	// Heal: +1 heart after healPerfectBoards perfect clears in a row (0 = off).
@@ -119,14 +122,20 @@ export class FFPlayer {
 	}
 	/** Ice is telegraphed on a visible target cell. free = landable cells now. */
 	receiveIce(count, free) {
+		const r = this.rules;
 		const ev = [];
 		for (let i = 0; i < count; i++) {
-			const target = this._pick(free);
-			this.iceIncoming.push({ eta: this.rules.iceEta, target });
-			ev.push({ kind: 'iceIncoming', target, eta: this.rules.iceEta });
+			if (r.maxIceIncoming && this.iceIncoming.length >= r.maxIceIncoming) {
+				ev.push({ kind: 'iceBlocked' });
+				continue;
+			}
+			const target = r.telegraphIce ? this._pick(free) : -1;
+			this.iceIncoming.push({ eta: r.iceEta, target });
+			ev.push({ kind: 'iceIncoming', target, eta: r.iceEta });
 		}
 		return ev;
 	}
+
 	/** Net-cancel: only packets still in flight, oldest first. Never the pool or the board. */
 	cancelIncoming(count) {
 		let left = count;
@@ -142,7 +151,7 @@ export class FFPlayer {
 	/** New board: re-aim telegraphed ice at cells that exist on it. */
 	retargetIce(free) {
 		for (const w of this.iceIncoming) w.target = -1;
-		for (const w of this.iceIncoming) w.target = this._pick(free);
+		if (this.rules.telegraphIce) for (const w of this.iceIncoming) w.target = this._pick(free);
 	}
 
 	// —— Your moves ——
@@ -241,14 +250,21 @@ export class FFPlayer {
 		this.ticks++;
 
 		// 1) Fuses
+		// Several mines going off on one move cost at most maxHeartsPerMove (anti-burst);
+		// every one still blasts the board.
+		const blown = [];
 		for (const m of [...this.mines]) {
 			m.fuse--;
 			if (m.fuse <= 0) {
 				this.mines.splice(this.mines.indexOf(m), 1);
-				this.hearts--;
 				this.stats.exploded++;
-				ev.push({ kind: 'mineExplode', cell: m.cell, hearts: this.hearts });
+				blown.push(m);
 			}
+		}
+		if (blown.length) {
+			const cap = r.maxHeartsPerMove || blown.length;
+			this.hearts -= Math.min(blown.length, cap);
+			for (const m of blown) ev.push({ kind: 'mineExplode', cell: m.cell, hearts: this.hearts, together: blown.length });
 		}
 
 		// 2) Passive thaw (sends nothing)

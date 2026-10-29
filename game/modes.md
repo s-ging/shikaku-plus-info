@@ -11,7 +11,7 @@ What the player can start from the home screen (`lib/home_screen.dart`) and the 
 | Daily puzzle | Everyone gets the same 6×6 Easy board each day | Live | Always |
 | Help Me! / Let Me Help! | Pass a board between friends | Live | Always |
 | Mosaic | Weekly shared image revealed by solving boards | Soft-retired 2026-06, code kept | n/a |
-| Versus | Head-to-head (Fuse & Frost) | In development, see [versus/](../versus/) | n/a |
+| Shikaku+ VS | Head-to-head | In development, see [versus/](../versus/) | n/a |
 
 ## Unlock ladder
 

@@ -1,6 +1,6 @@
 # Shikaku+ VS Lab
 
-Playable prototype of Shikaku+ VS mode. The current ruleset is **Fuse & Frost** ([versus/fuse-and-frost.md](../../versus/fuse-and-frost.md)): `src/fusefrost.js` + `src/ffmatch.js`, UI in `src/ffpage.html` + `src/ffapp.js`, tests in `test/fusefrost.test.js`, sim in `test/ffsim.js`. `node build.mjs` produces `dist/shikaku-vs-lab.html` (Fuse & Frost) and `dist/temperature-lab.html` (the original temperature economy, kept for reference).
+Playable prototype of Shikaku+ VS mode. The current ruleset is **Shikaku+ VS** (design name Fuse & Frost, hence the `ff` file names) ([versus/fuse-and-frost.md](../../versus/fuse-and-frost.md)): `src/fusefrost.js` + `src/ffmatch.js`, UI in `src/ffpage.html` + `src/ffapp.js`, tests in `test/fusefrost.test.js`, sim in `test/ffsim.js`. `node build.mjs` produces `dist/shikaku-vs-lab.html` (Fuse & Frost) and `dist/temperature-lab.html` (the original temperature economy, kept for reference).
 
 The rest of this README describes the original temperature prototype, built from the [temperature handoff](../../versus/archive/2026-10-29-temperature-handoff.md). It is a separate codebase; it never touches `shikaku-plus` or `shikaku-plus-landing`.
 
@@ -21,7 +21,7 @@ The rest of this README describes the original temperature prototype, built from
 ```
 node --test test/*.test.js   # edge cases
 node test/sim.js             # balance readout, both clocks (temperature economy)
-node test/ffsim.js           # Fuse & Frost balance readout
+node test/ffsim.js           # Shikaku+ VS balance readout
 node build.mjs               # rebuild the artifact page
 ```
 

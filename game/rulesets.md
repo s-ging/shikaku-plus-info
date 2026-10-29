@@ -44,4 +44,4 @@ Target count is capped: at most 10 (Hard: 8 below 12×12, 12 from 12×12; Brutal
 
 ## Versus
 
-Versus (Fuse & Frost) currently uses Classic boards only. See [versus/fuse-and-frost.md](../versus/fuse-and-frost.md).
+Shikaku+ VS currently uses Classic boards only. See [versus/fuse-and-frost.md](../versus/fuse-and-frost.md).
