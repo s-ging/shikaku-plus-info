@@ -113,7 +113,6 @@ export class FFMatch {
 		const a = this._apply(s, action);
 		if (!a.moved) return { moved: false, events: [], denied: a.denied };
 		tag(s, a.events);
-		this._icebreak(s, tag);
 
 		// Clear resolves before the tick, so its attack cancels incoming first.
 		if (isSolved(s.rects, s.N)) {
@@ -149,10 +148,23 @@ export class FFMatch {
 		const { mines, ice } = s.econ.drainOut();
 		if (mines) {
 			const n = this.rush ? mines * this.rules.rushMultiplier : mines;
-			const cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
-			const pass = n - cancelled;
+			let cancelled = 0;
+			let pass;
+			if (this.rules.counterSpike === 'refund') {
+				// Net-cancel, plus a refund: your attack cancels first, the rest goes out,
+				// and a share of what you cancelled is added back on top.
+				cancelled = s.econ.cancelIncoming(Math.min(n, this.rules.counterCap));
+				pass = n - cancelled + Math.floor(cancelled * (this.rules.counterRate ?? 1));
+			} else if (this.rules.counterSpike) {
+				// Counter-spike: cancel from your orange bank, then send it all back on top.
+				cancelled = s.econ.cancelIncoming(this.rules.counterCap);
+				pass = n + Math.floor(cancelled * (this.rules.counterRate ?? 1));
+			} else {
+				cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
+				pass = n - cancelled;
+			}
 			if (pass) opp.econ.receiveMines(pass).forEach((e) => out.push({ side: opp.name, ...e }));
-			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass, rush: this.rush });
+			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass, counter: !!this.rules.counterSpike && cancelled > 0, rush: this.rush });
 		}
 		if (ice) {
 			opp.econ.receiveIce(ice, opp.landable()).forEach((e) => out.push({ side: opp.name, ...e }));

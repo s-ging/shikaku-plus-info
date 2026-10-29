@@ -1388,7 +1388,22 @@ class ReplayBot {
 		const placed = new Set(side.rects.map(key));
 		let todo = sol.filter((s) => !placed.has(key(s)) && !side.isRectBlocked(s));
 		todo = todo.filter((s) => !side.rects.some((p) => p.overlaps(s)));
-		if (!todo.length) return null; // waiting on ice
+		if (!todo.length) {
+			// Waiting on ice. A person would build next to it to thaw it: re-commit a
+			// placed box beside the ice (a do-over, but it ticks and thaws).
+			const ice = side.iceCells ? side.iceCells() : new Set();
+			if (!side.rects.length) return null;
+			const near = side.rects.find((rc) => {
+				for (const c of ice) {
+					const x = c % N;
+					const y = Math.floor(c / N);
+					if (x >= rc.x1 - 1 && x <= rc.x2 + 1 && y >= rc.y1 - 1 && y <= rc.y2 + 1 &&
+						!(x < rc.x1 || x > rc.x2) !== !(y < rc.y1 || y > rc.y2)) return true;
+				}
+				return false;
+			});
+			return toAction(near ?? side.rects[this.rng.nextInt(side.rects.length)]);
+		}
 
 		// Prefer defusing the most urgent mine.
 		let pick = null;

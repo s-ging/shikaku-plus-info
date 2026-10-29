@@ -12,16 +12,21 @@ import { BoardCompletionSolver, EconRng } from './economy.js';
 
 export const FF_RULES = {
 	hearts: 3,
-	freezeOverAt: 3, // was 4; lowered when incoming ice was capped at 2 (2026-10-30)
+	freezeOverAt: 4,
 
 	// Attack
 	clearSend: 4,
 	perfectSendsIce: 1,
-	overflow: 'netCancel', // 'netCancel': your attack cancels your in-flight mines first | 'passthrough'
+	overflow: 'netCancel',
+	// Counter-spike: a clear cancels up to counterCap mines from your orange bank
+	// (never the red batch) and adds every cancelled mine to its own attack.
+	counterSpike: true,
+	counterCap: 12,
+	counterRate: 1, // share of the cancelled mines added back to your attack // 'netCancel': your attack cancels your in-flight mines first | 'passthrough'
 
 	// Mines
 	incomingEta: 3, // your moves before a sent packet arrives
-	batchSize: 4, // most that land in one move
+	batchSize: 6, // most that land in one move (was 4)
 	mineCap: 6, // live mines on board; the rest wait in the pool
 	mineFuse: 3,
 	maxHeartsPerMove: 1, // mines going off on the same move cost at most this many hearts (anti-burst)
@@ -29,8 +34,8 @@ export const FF_RULES = {
 	blastRadius: 1, // 3×3
 
 	// Ice
-	iceEta: 3,
-	maxIceIncoming: 2, // at most this much ice on its way at once; extra is dropped
+	iceEta: 2, // was 3: two moves of warning is more threatening
+	maxIceIncoming: 0, // 0 = no cap: ice stacks if the opponent is cracked
 	telegraphIce: false, // false: no target cell shown; the board just catches a chill until it lands
 	thawPoints: 4,
 	passiveThawEvery: 2, // −1 every 2 moves (0.5 per move)
@@ -38,6 +43,8 @@ export const FF_RULES = {
 	perPlacementThawCap: 2,
 	thawSendsIce: true, // ice you thaw by building is sent back
 	forceBreakSendsIce: false,
+	icebreakAtBoxesLeft: 2, // the icebreaker only helps on your last N boxes
+	icebreakPerMove: 1, // and breaks at most this many cells per move
 	icebreakSpills: true, // broken ice isn't destroyed: it returns on your next board
 
 	// Rush: once the round runs long, every mine attack is multiplied
@@ -46,14 +53,14 @@ export const FF_RULES = {
 
 	// Heal: +1 heart after healPerfectBoards perfect clears in a row (0 = off).
 	// A non-perfect clear resets the run; explosions don't count against perfect.
-	healPerfectBoards: 3,
+	healPerfectBoards: 4, // was 3
 	maxHealsPerRound: 1, // 0 = unlimited; stops a low-heart player from chaining heals
 	// Older idea, off: +1 heart every N placements in a row without a do-over.
 	healEvery: 0,
 
 	// On your board clear: mines that already arrived (the pool) die with the board.
 	// Mines still in flight keep coming unless clearWipesIncoming is on.
-	clearWipesPool: true,
+	clearWipesPool: false, // the red batch is committed: it lands on your next board
 	clearWipesIncoming: false,
 
 	solverBudget: 20000
@@ -90,9 +97,19 @@ export class FFPlayer {
 	get incomingTotal() {
 		return this.incoming.reduce((a, p) => a + p.count, 0);
 	}
+	/** Red: the batch that lands on your next move. Committed; can't be cancelled. */
+	get nextBatch() {
+		const arriving = this.pool + this.incoming.filter((p) => p.eta <= 1).reduce((a, p) => a + p.count, 0);
+		const room = Math.max(0, this.rules.mineCap - this.mines.length);
+		return Math.min(arriving, room, this.rules.batchSize);
+	}
+	/** Orange: everything else on its way or parked. A clear's counter-spike cancels from here. */
+	get bank() {
+		return this.pool + this.incomingTotal - this.nextBatch;
+	}
 	/** Moves until the next mine packet lands, or null. */
 	get nextMinesIn() {
-		if (this.pool > 0) return 0;
+		if (this.pool > 0) return 1;
 		return this.incoming.length ? Math.min(...this.incoming.map((p) => p.eta)) : null;
 	}
 	get isKO() {
@@ -138,16 +155,33 @@ export class FFPlayer {
 
 	/** Net-cancel: only packets still in flight, oldest first. Never the pool or the board. */
 	cancelIncoming(count) {
-		let left = count;
-		while (left > 0 && this.incoming.length) {
-			const p = this.incoming[0];
+		// Only the orange bank: far packets first (oldest first), then whatever is
+		// arriving next move beyond the red batch.
+		let left = Math.min(count, this.bank);
+		const start = left;
+		for (const p of this.incoming) {
+			if (left <= 0) break;
+			if (p.eta <= 1) continue;
 			const take = Math.min(left, p.count);
 			p.count -= take;
 			left -= take;
-			if (!p.count) this.incoming.shift();
 		}
-		return count - left;
+		for (const p of this.incoming) {
+			if (left <= 0) break;
+			if (p.eta > 1) continue;
+			const take = Math.min(left, p.count);
+			p.count -= take;
+			left -= take;
+		}
+		if (left > 0) {
+			const take = Math.min(left, this.pool);
+			this.pool -= take;
+			left -= take;
+		}
+		this.incoming = this.incoming.filter((p) => p.count > 0);
+		return start - left;
 	}
+
 	/** New board: re-aim telegraphed ice at cells that exist on it. */
 	retargetIce(free) {
 		for (const w of this.iceIncoming) w.target = -1;
@@ -348,16 +382,40 @@ export class FFPlayer {
 		const ties = atMin.filter((f) => f.seq === oldest);
 		return ties[this.rng.nextInt(ties.length)];
 	}
+	/** True if some unplaced clue has at least one valid box that avoids ice. */
+	hasIceFreeMove(board) {
+		const cov = new Set();
+		for (const rc of board.rects) for (let y = rc.y1; y <= rc.y2; y++) for (let x = rc.x1; x <= rc.x2; x++) cov.add(y * board.N + x);
+		const ice = this.iceSet();
+		for (let y = 0; y < board.N; y++)
+			for (let x = 0; x < board.N; x++) {
+				const v = board.nums[y][x];
+				if (!v || cov.has(y * board.N + x)) continue;
+				const cands = BoardCompletionSolver.candidates(board, { x, y, v }, cov);
+				if (cands.some((c) => c.cells.every((cell) => !ice.has(cell)))) return true;
+			}
+		return false;
+	}
+
 	checkStuckAndForceBreak(board, unplacedCount) {
 		const ev = [];
+		const r = this.rules;
 		if (!this.ice.length || unplacedCount > this.ice.length) return ev;
+		// Normally the icebreaker only helps on your last N boxes. But if ice leaves you
+		// with no legal placement at all, it steps in anyway: the board only ticks when
+		// you move, so with nothing to place the ice would never melt (a true softlock).
+		if (r.icebreakAtBoxesLeft && unplacedCount > r.icebreakAtBoxesLeft && this.hasIceFreeMove(board)) return ev;
+		let budget = r.icebreakPerMove || Infinity;
 		let guard = this.ice.length + 1;
 		let passB = null;
-		while (this.ice.length && guard-- > 0) {
+		while (this.ice.length && guard-- > 0 && budget-- > 0) {
 			const a = BoardCompletionSolver.analyze(board, this.iceSet(), this.rules.solverBudget);
 			if (passB === null) passB = a.solvable;
-			if (!passB || !a.blocked.length) break;
-			const target = this._nearestToThaw(this.ice.filter((f) => a.blockingIce.has(f.cell)));
+			const softlock = !this.hasIceFreeMove(board);
+			if (!softlock && (!passB || !a.blocked.length)) break;
+			let pool = this.ice.filter((f) => a.blockingIce.has(f.cell));
+			if (!pool.length && softlock) pool = this.ice; // nothing provably blocking: free the nearest-to-thaw
+			const target = this._nearestToThaw(pool);
 			if (!target) break;
 			ev.push(...this.forceBreakAt(target.cell));
 		}

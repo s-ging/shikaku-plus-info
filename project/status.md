@@ -19,7 +19,7 @@ Newest items at the top of each list. Tick items off (`[x]`) with the date; neve
 
 - [ ] Ship offline mode again (Krischan: "I badly need to ship the offline mode"); first pin down what it covered ([open questions](open-questions.md))
 - [ ] Versus readability: what each hazard means at a glance, first-match experience ([versus/fuse-and-frost.md](../versus/fuse-and-frost.md))
-- [ ] Settle Versus open questions: pool freezing, mines vs ice balance
+- [ ] Settle Versus open questions: counter-spike strength, ice threat, pool freezing
 - [ ] Port the Versus economy to Dart, checked against vectors from the JS prototype ([versus/README.md](../versus/README.md#path-to-shipping))
 - [ ] Decide the Versus server ([decision 0005](../decisions/0005-cloudflare-for-versus.md))
 - [ ] Monetization: decide whether to register a business, pick a merchant of record, then build the payments that `kSupportUrl` and the IAP code expect ([open questions](open-questions.md#business))
@@ -29,6 +29,7 @@ Newest items at the top of each list. Tick items off (`[x]`) with the date; neve
 
 ### Done
 
+- [x] 2026-10-30 VS frame: hearts pole and hazard bar (orange bank, red batch, ice block), fire meter with projectiles, counter-spikes; ice lands in 2 moves and stacks, freeze-over back to 4, batch 6, heal after 4 perfect boards, icebreaker on the last 2 boxes ([log](../logs/2026-10-30-vs-frame-and-counter-spikes.md))
 - [x] 2026-10-30 VS rule tweaks: anti-burst, max 2 ice on the way with a board-wide chill instead of a marked cell, freeze-over 3, rush at 100; name is now just "Shikaku+ VS" ([rules](../versus/fuse-and-frost.md))
 - [x] 2026-10-30 `work-week/shikaku-plus-copy` made private (Krischan)
 - [x] 2026-10-30 Wiki and knowledge base set up in `s-ging/shikaku-plus-info`, with the Versus prototype, archives and the board tool ([log](../logs/2026-10-30-knowledge-base-setup.md))

@@ -22,6 +22,8 @@
 	--ice: #80b3e6;
 	--ink: #121212;
 	--accent: #d0b878;
+	--bank: #f0a040;
+	--slot: #262626;
 	--num-on-block: rgba(0, 0, 0, 0.35);
 	--drag-fill: rgba(68, 136, 255, 0.3);
 	--drag-stroke: #4488ff;
@@ -66,6 +68,29 @@ canvas.board { display: block; width: 100%; height: auto; aspect-ratio: 1; touch
 .foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 10px 6px 12px; font-size: 13px; color: var(--fg2); }
 .foot .who { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 18px; justify-content: center; }
 .foot .right { text-align: right; color: var(--mine); }
+.frame { display: grid; grid-template-columns: 12px minmax(0, 1fr) 12px; gap: 8px; align-items: stretch; }
+.pole { display: flex; flex-direction: column; gap: 2px; }
+.pole i { display: block; border-radius: 2px; background: var(--slot); flex: 1 1 0; position: relative; overflow: hidden; }
+.lives i { flex: 1 1 0; }
+.lives i.on { background: var(--you); }
+.lives i .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--you); }
+.lives i.healing .fill { animation: heartbeat 1.1s linear infinite; }
+@keyframes heartbeat { 0% { opacity: 0.35; } 8% { opacity: 1; } 16% { opacity: 0.5; } 26% { opacity: 1; } 42% { opacity: 0.35; } 100% { opacity: 0.35; } }
+.hazards i.bank.on { background: var(--bank); }
+.hazards i.bank.over { animation: blink 0.5s steps(2, jump-none) infinite; }
+.hazards i.batch.on { background: var(--mine); }
+.hazards i.ice { flex: 4 1 0; }
+.hazards i.ice.eta2 { background: #8098b0; }
+.hazards i.ice.eta1 { background: #7cb3eb; animation: blink 0.36s steps(2, jump-none) infinite; }
+.hazards i.ice.now { background: #ffffff; }
+@keyframes blink { 50% { opacity: 0.4; } }
+.fire { margin-left: 10px; font-size: 15px; color: var(--bank); min-width: 2.5em; text-align: left; display: inline-block; position: relative; }
+.fire .pop { position: absolute; left: 0; bottom: 100%; font-weight: 600; animation: rise 0.9s ease-out forwards; white-space: nowrap; }
+.fire .pop.big { font-size: 22px; color: #fff; }
+@keyframes rise { from { transform: translateY(6px); opacity: 1; } to { transform: translateY(-34px); opacity: 0; } }
+.shot { position: fixed; width: 14px; height: 14px; border-radius: 3px; background: var(--bank); pointer-events: none; z-index: 5; box-shadow: 0 0 0 3px rgba(240, 160, 64, 0.25); }
+.shot.big { width: 20px; height: 20px; }
+@media (prefers-reduced-motion: reduce) { .lives i.healing .fill, .hazards i { animation: none !important; } .fire .pop { animation-duration: 0.01s; } }
 .hearts { display: inline-flex; gap: 3px; }
 .hearts i { width: 9px; height: 9px; border-radius: 2px; background: var(--you); display: block; }
 .hearts i.lost { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg3); }
@@ -143,10 +168,14 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 
 	<main class="arena">
 		<section class="card" aria-label="Your board">
-			<canvas class="board" id="you-board" aria-label="Your Shikaku board"></canvas>
+			<div class="frame">
+				<div class="pole lives" id="you-lives" aria-label="Hearts"></div>
+				<canvas class="board" id="you-board" aria-label="Your Shikaku board"></canvas>
+				<div class="pole hazards" id="you-hazards" aria-label="Incoming mines and ice"></div>
+			</div>
 			<div class="foot">
 				<span class="num" id="you-left">Board 1 · 0:00:000</span>
-				<span class="who"><span class="hearts" id="you-hearts"></span>You</span>
+				<span class="who">You<span class="fire num" id="you-fire"></span></span>
 				<span class="right num" id="you-right"></span>
 			</div>
 			<div class="overlay" id="overlay" hidden>
@@ -156,16 +185,20 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 			</div>
 		</section>
 		<section class="card" aria-label="Bot board">
-			<canvas class="board" id="them-board" aria-label="Bot board"></canvas>
+			<div class="frame">
+				<div class="pole lives" id="them-lives" aria-label="Hearts"></div>
+				<canvas class="board" id="them-board" aria-label="Bot board"></canvas>
+				<div class="pole hazards" id="them-hazards" aria-label="Incoming mines and ice"></div>
+			</div>
 			<div class="foot">
 				<span class="num" id="them-left">Board 1</span>
-				<span class="who"><span class="hearts" id="them-hearts"></span>Bot</span>
+				<span class="who">Bot<span class="fire num" id="them-fire"></span></span>
 				<span class="right num" id="them-right"></span>
 			</div>
 		</section>
 	</main>
 
-	<p class="hint">Drag to place a rectangle, tap one to erase it. Every move is a tick for your board only. Incoming mines land when you move, so you can stop and plan. Cover a mine to defuse it. Build next to ice to thaw it and send it back. Three perfect boards in a row (no erases or overwrites) heals a heart, once per round.</p>
+	<p class="hint">Drag to place a box, tap one to erase it. Your board only moves when you do. Cover mines to defuse them, build next to ice to thaw it. Clear your board to cancel the orange mines and throw them back.</p>
 	<div class="controls">
 		<div class="seg" id="presets" role="group" aria-label="Bot difficulty"></div>
 		<button class="btn" id="pause">Pause bot</button>
@@ -179,7 +212,7 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 		</div>
 		<div class="panel">
 			<h3>Rules lab</h3>
-			<p class="note">Presets are calibrated bot-vs-bot: each one beats the level below about 85% of the time. A strong player (about 2s per move) should beat Normal most rounds, split Hard, and steal the odd round from Impossible. Icebroken ice spills onto your next board; turn that off and ice stops mattering.</p>
+			<p class="note">Left pole: your hearts; a lost heart fills back up, beating, one step per perfect board. Right pole: everything coming at you. Orange is the mine bank (a clear counter-spikes it), red is the batch landing on your next move, the blue block is ice (slate = 2 moves, light blue blinking = next move, white = landing).</p>
 			<div class="groups" id="groups"></div>
 			<div class="tools">
 				<button class="btn" id="t-mines">Send me 4 mines</button>
@@ -1346,7 +1379,22 @@ class ReplayBot {
 		const placed = new Set(side.rects.map(key));
 		let todo = sol.filter((s) => !placed.has(key(s)) && !side.isRectBlocked(s));
 		todo = todo.filter((s) => !side.rects.some((p) => p.overlaps(s)));
-		if (!todo.length) return null; // waiting on ice
+		if (!todo.length) {
+			// Waiting on ice. A person would build next to it to thaw it: re-commit a
+			// placed box beside the ice (a do-over, but it ticks and thaws).
+			const ice = side.iceCells ? side.iceCells() : new Set();
+			if (!side.rects.length) return null;
+			const near = side.rects.find((rc) => {
+				for (const c of ice) {
+					const x = c % N;
+					const y = Math.floor(c / N);
+					if (x >= rc.x1 - 1 && x <= rc.x2 + 1 && y >= rc.y1 - 1 && y <= rc.y2 + 1 &&
+						!(x < rc.x1 || x > rc.x2) !== !(y < rc.y1 || y > rc.y2)) return true;
+				}
+				return false;
+			});
+			return toAction(near ?? side.rects[this.rng.nextInt(side.rects.length)]);
+		}
 
 		// Prefer defusing the most urgent mine.
 		let pick = null;
@@ -1406,16 +1454,21 @@ class ReplayBot {
 
 const FF_RULES = {
 	hearts: 3,
-	freezeOverAt: 3, // was 4; lowered when incoming ice was capped at 2 (2026-10-30)
+	freezeOverAt: 4,
 
 	// Attack
 	clearSend: 4,
 	perfectSendsIce: 1,
-	overflow: 'netCancel', // 'netCancel': your attack cancels your in-flight mines first | 'passthrough'
+	overflow: 'netCancel',
+	// Counter-spike: a clear cancels up to counterCap mines from your orange bank
+	// (never the red batch) and adds every cancelled mine to its own attack.
+	counterSpike: true,
+	counterCap: 12,
+	counterRate: 1, // share of the cancelled mines added back to your attack // 'netCancel': your attack cancels your in-flight mines first | 'passthrough'
 
 	// Mines
 	incomingEta: 3, // your moves before a sent packet arrives
-	batchSize: 4, // most that land in one move
+	batchSize: 6, // most that land in one move (was 4)
 	mineCap: 6, // live mines on board; the rest wait in the pool
 	mineFuse: 3,
 	maxHeartsPerMove: 1, // mines going off on the same move cost at most this many hearts (anti-burst)
@@ -1423,8 +1476,8 @@ const FF_RULES = {
 	blastRadius: 1, // 3×3
 
 	// Ice
-	iceEta: 3,
-	maxIceIncoming: 2, // at most this much ice on its way at once; extra is dropped
+	iceEta: 2, // was 3: two moves of warning is more threatening
+	maxIceIncoming: 0, // 0 = no cap: ice stacks if the opponent is cracked
 	telegraphIce: false, // false: no target cell shown; the board just catches a chill until it lands
 	thawPoints: 4,
 	passiveThawEvery: 2, // −1 every 2 moves (0.5 per move)
@@ -1432,6 +1485,8 @@ const FF_RULES = {
 	perPlacementThawCap: 2,
 	thawSendsIce: true, // ice you thaw by building is sent back
 	forceBreakSendsIce: false,
+	icebreakAtBoxesLeft: 2, // the icebreaker only helps on your last N boxes
+	icebreakPerMove: 1, // and breaks at most this many cells per move
 	icebreakSpills: true, // broken ice isn't destroyed: it returns on your next board
 
 	// Rush: once the round runs long, every mine attack is multiplied
@@ -1440,14 +1495,14 @@ const FF_RULES = {
 
 	// Heal: +1 heart after healPerfectBoards perfect clears in a row (0 = off).
 	// A non-perfect clear resets the run; explosions don't count against perfect.
-	healPerfectBoards: 3,
+	healPerfectBoards: 4, // was 3
 	maxHealsPerRound: 1, // 0 = unlimited; stops a low-heart player from chaining heals
 	// Older idea, off: +1 heart every N placements in a row without a do-over.
 	healEvery: 0,
 
 	// On your board clear: mines that already arrived (the pool) die with the board.
 	// Mines still in flight keep coming unless clearWipesIncoming is on.
-	clearWipesPool: true,
+	clearWipesPool: false, // the red batch is committed: it lands on your next board
 	clearWipesIncoming: false,
 
 	solverBudget: 20000
@@ -1484,9 +1539,19 @@ class FFPlayer {
 	get incomingTotal() {
 		return this.incoming.reduce((a, p) => a + p.count, 0);
 	}
+	/** Red: the batch that lands on your next move. Committed; can't be cancelled. */
+	get nextBatch() {
+		const arriving = this.pool + this.incoming.filter((p) => p.eta <= 1).reduce((a, p) => a + p.count, 0);
+		const room = Math.max(0, this.rules.mineCap - this.mines.length);
+		return Math.min(arriving, room, this.rules.batchSize);
+	}
+	/** Orange: everything else on its way or parked. A clear's counter-spike cancels from here. */
+	get bank() {
+		return this.pool + this.incomingTotal - this.nextBatch;
+	}
 	/** Moves until the next mine packet lands, or null. */
 	get nextMinesIn() {
-		if (this.pool > 0) return 0;
+		if (this.pool > 0) return 1;
 		return this.incoming.length ? Math.min(...this.incoming.map((p) => p.eta)) : null;
 	}
 	get isKO() {
@@ -1532,16 +1597,33 @@ class FFPlayer {
 
 	/** Net-cancel: only packets still in flight, oldest first. Never the pool or the board. */
 	cancelIncoming(count) {
-		let left = count;
-		while (left > 0 && this.incoming.length) {
-			const p = this.incoming[0];
+		// Only the orange bank: far packets first (oldest first), then whatever is
+		// arriving next move beyond the red batch.
+		let left = Math.min(count, this.bank);
+		const start = left;
+		for (const p of this.incoming) {
+			if (left <= 0) break;
+			if (p.eta <= 1) continue;
 			const take = Math.min(left, p.count);
 			p.count -= take;
 			left -= take;
-			if (!p.count) this.incoming.shift();
 		}
-		return count - left;
+		for (const p of this.incoming) {
+			if (left <= 0) break;
+			if (p.eta > 1) continue;
+			const take = Math.min(left, p.count);
+			p.count -= take;
+			left -= take;
+		}
+		if (left > 0) {
+			const take = Math.min(left, this.pool);
+			this.pool -= take;
+			left -= take;
+		}
+		this.incoming = this.incoming.filter((p) => p.count > 0);
+		return start - left;
 	}
+
 	/** New board: re-aim telegraphed ice at cells that exist on it. */
 	retargetIce(free) {
 		for (const w of this.iceIncoming) w.target = -1;
@@ -1742,16 +1824,40 @@ class FFPlayer {
 		const ties = atMin.filter((f) => f.seq === oldest);
 		return ties[this.rng.nextInt(ties.length)];
 	}
+	/** True if some unplaced clue has at least one valid box that avoids ice. */
+	hasIceFreeMove(board) {
+		const cov = new Set();
+		for (const rc of board.rects) for (let y = rc.y1; y <= rc.y2; y++) for (let x = rc.x1; x <= rc.x2; x++) cov.add(y * board.N + x);
+		const ice = this.iceSet();
+		for (let y = 0; y < board.N; y++)
+			for (let x = 0; x < board.N; x++) {
+				const v = board.nums[y][x];
+				if (!v || cov.has(y * board.N + x)) continue;
+				const cands = BoardCompletionSolver.candidates(board, { x, y, v }, cov);
+				if (cands.some((c) => c.cells.every((cell) => !ice.has(cell)))) return true;
+			}
+		return false;
+	}
+
 	checkStuckAndForceBreak(board, unplacedCount) {
 		const ev = [];
+		const r = this.rules;
 		if (!this.ice.length || unplacedCount > this.ice.length) return ev;
+		// Normally the icebreaker only helps on your last N boxes. But if ice leaves you
+		// with no legal placement at all, it steps in anyway: the board only ticks when
+		// you move, so with nothing to place the ice would never melt (a true softlock).
+		if (r.icebreakAtBoxesLeft && unplacedCount > r.icebreakAtBoxesLeft && this.hasIceFreeMove(board)) return ev;
+		let budget = r.icebreakPerMove || Infinity;
 		let guard = this.ice.length + 1;
 		let passB = null;
-		while (this.ice.length && guard-- > 0) {
+		while (this.ice.length && guard-- > 0 && budget-- > 0) {
 			const a = BoardCompletionSolver.analyze(board, this.iceSet(), this.rules.solverBudget);
 			if (passB === null) passB = a.solvable;
-			if (!passB || !a.blocked.length) break;
-			const target = this._nearestToThaw(this.ice.filter((f) => a.blockingIce.has(f.cell)));
+			const softlock = !this.hasIceFreeMove(board);
+			if (!softlock && (!passB || !a.blocked.length)) break;
+			let pool = this.ice.filter((f) => a.blockingIce.has(f.cell));
+			if (!pool.length && softlock) pool = this.ice; // nothing provably blocking: free the nearest-to-thaw
+			const target = this._nearestToThaw(pool);
 			if (!target) break;
 			ev.push(...this.forceBreakAt(target.cell));
 		}
@@ -1875,7 +1981,6 @@ class FFMatch {
 		const a = this._apply(s, action);
 		if (!a.moved) return { moved: false, events: [], denied: a.denied };
 		tag(s, a.events);
-		this._icebreak(s, tag);
 
 		// Clear resolves before the tick, so its attack cancels incoming first.
 		if (isSolved(s.rects, s.N)) {
@@ -1911,10 +2016,23 @@ class FFMatch {
 		const { mines, ice } = s.econ.drainOut();
 		if (mines) {
 			const n = this.rush ? mines * this.rules.rushMultiplier : mines;
-			const cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
-			const pass = n - cancelled;
+			let cancelled = 0;
+			let pass;
+			if (this.rules.counterSpike === 'refund') {
+				// Net-cancel, plus a refund: your attack cancels first, the rest goes out,
+				// and a share of what you cancelled is added back on top.
+				cancelled = s.econ.cancelIncoming(Math.min(n, this.rules.counterCap));
+				pass = n - cancelled + Math.floor(cancelled * (this.rules.counterRate ?? 1));
+			} else if (this.rules.counterSpike) {
+				// Counter-spike: cancel from your orange bank, then send it all back on top.
+				cancelled = s.econ.cancelIncoming(this.rules.counterCap);
+				pass = n + Math.floor(cancelled * (this.rules.counterRate ?? 1));
+			} else {
+				cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
+				pass = n - cancelled;
+			}
 			if (pass) opp.econ.receiveMines(pass).forEach((e) => out.push({ side: opp.name, ...e }));
-			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass, rush: this.rush });
+			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass, counter: !!this.rules.counterSpike && cancelled > 0, rush: this.rush });
 		}
 		if (ice) {
 			opp.econ.receiveIce(ice, opp.landable()).forEach((e) => out.push({ side: opp.name, ...e }));
@@ -2253,7 +2371,7 @@ const BOT_PRESETS = {
 			// Ice on its way: the whole board catches a chill instead of a marked cell.
 			if (e.iceIncoming.length) {
 				const soon = Math.min(...e.iceIncoming.map((w) => w.eta));
-				const near = 1 - Math.max(0, soon - 1) / Math.max(1, RULES.iceEta);
+				const near = Math.min(1, Math.max(0, 1 - Math.max(0, soon - 1) / Math.max(1, RULES.iceEta)));
 				c.globalAlpha = 0.06 + 0.1 * near + 0.04 * (e.iceIncoming.length - 1);
 				c.fillStyle = C.ice;
 				c.fillRect(0, 0, this.S, this.S);
@@ -2341,6 +2459,7 @@ const BOT_PRESETS = {
 	function loop(now) {
 		for (const v of views) v.draw(now);
 		renderTimer(now);
+		if (now < iceFlashUntil[0] + 30 || now < iceFlashUntil[1] + 30) { renderPoles(0, 'you'); renderPoles(1, 'them'); }
 		requestAnimationFrame(loop);
 	}
 
@@ -2381,7 +2500,7 @@ const BOT_PRESETS = {
 			case 'forceBreak': return e.spills ? 'icebreaker: ice spills to next board' : 'icebreaker';
 			case 'clear': return `board cleared${e.perfect ? ' perfect' : ''}: ${e.sendMines} mines${e.sendIce ? ` + ${e.sendIce} ice` : ''}${e.wiped ? `, ${e.wiped} waiting mines died with the board` : ''}`;
 			case 'heal': return e.boards ? (e.healed ? `${e.boards} perfect boards in a row: healed a heart` : `${e.boards} perfect boards in a row (hearts already full)`) : e.healed ? `${e.streak}x streak: healed a heart` : `${e.streak}x streak (hearts already full)`;
-			case 'send': return e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
+			case 'send': return e.counter ? `counter-spike: cancelled ${e.cancelled}, sent ${e.pass}${e.rush ? ' (rush)' : ''}` : e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
 			case 'sendIce': return `sent ${e.count} ice`;
 			case 'ko': return e.by === 'ice' ? 'frozen over' : 'out of hearts';
 			default: return null;
@@ -2402,6 +2521,8 @@ const BOT_PRESETS = {
 				else if (e.kind === 'thaw') v.flash('shatter', e.cell, 0.3);
 			}
 			if (e.kind === 'heal' && e.healed) pulseHearts(e.side);
+			if (e.kind === 'send' && e.pass > 0) fire(e.side === 'you' ? 0 : 1, e.pass, !!e.counter);
+			if (e.kind === 'frozen') iceFlashUntil[e.side === 'you' ? 0 : 1] = performance.now() + 260;
 			if (e.kind === 'roundOver') showRoundOver(e);
 			const text = describe(e);
 			if (text) logItems.unshift({ side: e.side, text });
@@ -2412,7 +2533,7 @@ const BOT_PRESETS = {
 	}
 
 	function pulseHearts(side) {
-		const el = $(side === 'you' ? 'you-hearts' : 'them-hearts');
+		const el = $(side === 'you' ? 'you-lives' : 'them-lives');
 		if (!el || REDUCED) return;
 		el.classList.remove('healed');
 		void el.offsetWidth;
@@ -2458,36 +2579,100 @@ const BOT_PRESETS = {
 		if (total) parts.push(`· ${total} queued`);
 		return parts.join(' ');
 	}
+	// —— The two poles: hearts on the left, incoming hazards on the right ——
+	const BANK_SLOTS = 16;
+	const iceFlashUntil = [0, 0];
+	function buildPoles(prefix) {
+		const lives = $(prefix + '-lives');
+		lives.innerHTML = '';
+		for (let i = 0; i < RULES.hearts; i++) {
+			const seg = document.createElement('i');
+			seg.appendChild(Object.assign(document.createElement('span'), { className: 'fill' }));
+			lives.appendChild(seg);
+		}
+		const hz = $(prefix + '-hazards');
+		hz.innerHTML = '';
+		for (let i = 0; i < BANK_SLOTS; i++) hz.appendChild(Object.assign(document.createElement('i'), { className: 'bank' }));
+		for (let i = 0; i < RULES.batchSize; i++) hz.appendChild(Object.assign(document.createElement('i'), { className: 'batch' }));
+		hz.appendChild(Object.assign(document.createElement('i'), { className: 'ice' }));
+		hz.dataset.batch = RULES.batchSize;
+		lives.dataset.hearts = RULES.hearts;
+	}
+	function renderPoles(idx, prefix) {
+		const e = match.sides[idx].econ;
+		const lives = $(prefix + '-lives');
+		const hz = $(prefix + '-hazards');
+		if (Number(lives.dataset.hearts) !== RULES.hearts || Number(hz.dataset.batch) !== RULES.batchSize) buildPoles(prefix);
+		// Hearts fill from the bottom. Only the first missing one can heal: it fills a
+		// step per perfect board and beats like a heart while it's tentative.
+		const canHeal = RULES.healPerfectBoards && (!RULES.maxHealsPerRound || e.heals < RULES.maxHealsPerRound);
+		const segs = [...lives.children].reverse();
+		segs.forEach((seg, i) => {
+			const alive = i < e.hearts;
+			seg.className = alive ? 'on' : '';
+			const fill = seg.firstChild;
+			const healing = !alive && i === e.hearts && canHeal && e.perfectRun > 0;
+			fill.style.height = healing ? `${(100 * e.perfectRun) / RULES.healPerfectBoards}%` : '0';
+			if (healing) seg.classList.add('healing');
+		});
+		// Hazards, top to bottom: orange bank, red next batch, one ice block.
+		const kids = [...hz.children];
+		const bankSegs = kids.slice(0, BANK_SLOTS).reverse(); // fill from the bottom of the orange section
+		const bank = e.bank;
+		bankSegs.forEach((seg, i) => {
+			seg.className = 'bank' + (i < bank ? ' on' : '') + (bank > BANK_SLOTS && i === BANK_SLOTS - 1 ? ' over' : '');
+		});
+		const batchSegs = kids.slice(BANK_SLOTS, BANK_SLOTS + RULES.batchSize).reverse();
+		const next = e.nextBatch;
+		batchSegs.forEach((seg, i) => (seg.className = 'batch' + (i < next ? ' on' : '')));
+		const ice = kids[kids.length - 1];
+		const soon = e.iceIncoming.length ? Math.min(...e.iceIncoming.map((w) => w.eta)) : null;
+		let state = '';
+		if (performance.now() < iceFlashUntil[idx]) state = ' now';
+		else if (soon !== null) state = soon <= 1 ? ' eta1' : ' eta2';
+		ice.className = 'ice' + state;
+		ice.title = e.iceIncoming.length ? `${e.iceIncoming.length} ice on the way` : 'No ice on the way';
+	}
+
+	// —— Attacks: a +N by your name, and a projectile across to the other board ——
+	function fire(idx, count, big) {
+		const prefix = idx === 0 ? 'you' : 'them';
+		const meter = $(prefix + '-fire');
+		meter.textContent = `+${count}`;
+		const pop = Object.assign(document.createElement('span'), { className: 'pop' + (big ? ' big' : ''), textContent: `+${count}` });
+		meter.appendChild(pop);
+		setTimeout(() => pop.remove(), 950);
+		if (REDUCED) return;
+		const from = $(prefix + '-board').getBoundingClientRect();
+		const to = $((idx === 0 ? 'them' : 'you') + '-hazards').getBoundingClientRect();
+		const shot = Object.assign(document.createElement('div'), { className: 'shot' + (big ? ' big' : '') });
+		document.body.appendChild(shot);
+		const x0 = from.left + from.width / 2;
+		const y0 = from.top + from.height / 2;
+		const x1 = to.left + to.width / 2;
+		const y1 = to.top + to.height * 0.3;
+		const lift = -Math.max(40, Math.abs(x1 - x0) * 0.25);
+		shot.animate(
+			[
+				{ transform: `translate(${x0}px, ${y0}px) scale(1)` },
+				{ transform: `translate(${(x0 + x1) / 2}px, ${(y0 + y1) / 2 + lift}px) scale(1.15)`, offset: 0.5 },
+				{ transform: `translate(${x1}px, ${y1}px) scale(0.6)` }
+			],
+			{ duration: 420, easing: 'cubic-bezier(.3,.6,.4,1)' }
+		).onfinish = () => shot.remove();
+		shot.style.left = '-7px';
+		shot.style.top = '-7px';
+	}
+
 	function renderHud() {
 		if (!match) return;
 		const [you, them] = match.sides;
 		$('score-you').textContent = match.score[0];
 		$('score-them').textContent = match.score[1];
-		hearts($('you-hearts'), you.econ);
-		hearts($('them-hearts'), them.econ);
-		$('you-right').innerHTML = '';
-		$('them-right').innerHTML = '';
-		for (const [s, el] of [[you, $('you-right')], [them, $('them-right')]]) {
-			const t = document.createElement('span');
-			t.textContent = rightText(s.econ);
-			el.appendChild(t);
-			const canHeal = RULES.healPerfectBoards && (!RULES.maxHealsPerRound || s.econ.heals < RULES.maxHealsPerRound);
-			if (canHeal && s.econ.perfectRun > 0) {
-				const st = document.createElement('span');
-				st.className = 'streak';
-				st.textContent = `${t.textContent ? ' · ' : ''}Perfect ${s.econ.perfectRun}/${RULES.healPerfectBoards}`;
-				st.title = 'Perfect boards in a row; reaching the target heals a heart';
-				el.appendChild(st);
-			}
-			const inc = s.econ.iceIncoming.length;
-			if (s.econ.ice.length || inc) {
-				const ic = document.createElement('span');
-				ic.className = 'icecount';
-				const soonest = inc ? Math.min(...s.econ.iceIncoming.map((w) => w.eta)) : 0;
-				ic.textContent = `${t.textContent ? ' · ' : ''}Ice ${s.econ.ice.length}/${RULES.freezeOverAt}${inc ? ` (+${inc} in ${Math.max(0, soonest)})` : ''}`;
-				el.appendChild(ic);
-			}
-		}
+		renderPoles(0, 'you');
+		renderPoles(1, 'them');
+		$('you-right').textContent = '';
+		$('them-right').textContent = '';
 		$('them-left').textContent = `Board ${them.boardIndex + 1}`;
 		$('mode-line').textContent = `6×6 · Classic · FT${match.target}${match.rush ? ` · Rush ×${RULES.rushMultiplier}` : ''}`;
 	}
@@ -2577,11 +2762,14 @@ const BOT_PRESETS = {
 		['Match', [
 			{ k: 'hearts', label: 'Hearts', min: 1, max: 6, step: 1 },
 			{ k: 'freezeOverAt', label: 'Freeze-over at', min: 2, max: 8, step: 1, fmt: (v) => `${v} ice` },
+			{ k: 'icebreakAtBoxesLeft', label: 'Icebreaker on last N boxes', min: 0, max: 6, step: 1, fmt: (v) => (v ? String(v) : 'any time') },
 			{ k: 'healPerfectBoards', label: 'Heal after perfect boards', min: 0, max: 8, step: 1, fmt: (v) => (v ? `${v} in a row` : 'off') },
 			{ k: 'maxHealsPerRound', label: 'Max heals per round', min: 0, max: 5, step: 1, fmt: (v) => (v ? String(v) : 'no limit') },
 			{ k: 'rushAfter', label: 'Rush after (moves)', min: 0, max: 300, step: 10, fmt: (v) => (v ? String(v) : 'off') },
 			{ k: 'rushMultiplier', label: 'Rush multiplier', min: 2, max: 20, step: 1, fmt: (v) => `×${v}` },
-			{ k: 'overflow', label: 'Overflow', options: [['netCancel', 'Net-cancel (in flight)'], ['passthrough', 'Passthrough']] }
+			{ k: 'counterSpike', label: 'Counter', options: [['true', 'Counter-spike (cancel bank, send it back)'], ['refund', 'Refund (attack cancels, half comes back)'], ['false', 'Plain net-cancel']] },
+			{ k: 'counterRate', label: 'Counter adds back', min: 0, max: 1, step: 0.25, fmt: (v) => Math.round(v * 100) + '%' },
+			{ k: 'overflow', label: 'Overflow (no counter)', options: [['netCancel', 'Net-cancel'], ['passthrough', 'Passthrough']] }
 		]],
 		['Mines', [
 			{ k: 'clearSend', label: 'Clear sends', min: 1, max: 10, step: 1 },
@@ -2632,8 +2820,8 @@ const BOT_PRESETS = {
 					row.className = 'row toggle';
 					const sel = Object.assign(document.createElement('select'), { id });
 					for (const [v, t] of it.options) sel.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: t }));
-					sel.value = o[it.k];
-					sel.addEventListener('change', () => (o[it.k] = sel.value));
+					sel.value = String(o[it.k]);
+					sel.addEventListener('change', () => (o[it.k] = sel.value === 'true' ? true : sel.value === 'false' ? false : sel.value));
 					row.appendChild(sel);
 				} else {
 					row.className = 'row';

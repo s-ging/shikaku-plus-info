@@ -29,38 +29,62 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 | --- | --- |
 | A board clear sends | 4 mines |
 | Mines arrive after | 3 of the receiver's moves |
-| Landing | Up to 4 per move, on empty non-clue cells |
+| Landing | Up to 6 per move (was 4), on empty non-clue cells |
 | Live mines on a board | At most 6; the rest wait in a pool and drop in as room frees up |
 | Fuse | 3 of your moves |
 | Defuse | Cover the mine with a placed box. No reward beyond surviving. |
 | Explosion | −1 heart, and every box touching the 3×3 blast is removed. Mines that go off on the same move cost **one heart in total** (anti-burst, 2026-10-30); each still blasts. |
-| Your board clears | Its live mines and its waiting pool die with it; mines still in flight keep coming |
+| Your board clears | Its live mines die with it. The red batch is committed and lands on your next board; the orange bank is what your counter-spike eats. |
 
-**Net-cancel:** your attack first cancels mines still in flight to you, oldest first. It never touches the pool or mines already on your board. Once trouble has landed, you dig out of it.
+**The queue.** Everything coming at you is split in two: the **red batch** (what lands on your next move, up to 6; committed, too late to stop) and the **orange bank** (everything after that).
+
+**Counter-spikes (2026-10-30, Krischan: "that is the sauce").** When you clear a board, it cancels up to 12 mines from your orange bank and adds every cancelled mine to its own attack: cancel 11, send 15. You watch orange pile up, hold your last box, and clear right before it turns red. A gentler "refund" mode (your attack cancels first, half of what it cancels comes back) and plain net-cancel are both selectable in the lab.
 
 ## Ice
 
 | Rule | Value |
 | --- | --- |
 | Sources | A perfect clear (no erase or overwrite on that board) sends 1 ice. Ice your opponent thaws by building comes back to you. |
-| On the way | At most **2** at once; extra is dropped (2026-10-30). No landing cell is marked: the whole board catches a chill (a blue frost and drifting snow, stronger as it gets close) and the footer counts down. Lands on a random empty non-clue cell after 3 of your moves. |
+| On the way | Lands **2** of your moves after it's sent, on a random empty non-clue cell. No cap: ice stacks if the opponent is cracked. No landing cell is marked; the board catches a chill (blue frost, drifting snow) and the ice block on the hazard bar blinks. |
 | Effect | Refuses boxes. A board cannot be finished while ice is on it. |
 | Thaw points | 4, shown as a growing dark wedge |
 | Passive thaw | −1 every 2 of your moves; sends nothing |
 | Active thaw | Placing a box that shares an edge with it: −2. Thawing it out this way sends it to your opponent. |
-| Icebreaker | If ice leaves you with no possible move, it breaks automatically, so you are never stuck. The broken ice is not destroyed: it **spills onto your next board**. |
+| Icebreaker | Only on your **last 2 boxes**, one cell per move, nearest-to-thaw first. It also steps in any time ice leaves you with no legal move at all, because the board only ticks when you move, so stuck ice would never melt. Broken ice **spills onto your next board**. |
 | Explosions | Never touch ice (for now) |
 
 ## Rounds and the match
 
 - 3 hearts per round.
-- **KO:** out of hearts, or 3 ice on your board at once (**freeze-over**; was 4 until the ice cap, see below). Ice still on its way doesn't count until it lands, and several can land on one move.
+- **KO:** out of hearts, or 4 ice on your board at once (**freeze-over**). Ice still on its way doesn't count until it lands, and several can land on one move.
 - A KO ends the round and **fully resets both players**, winner included, so nobody snowballs. First to 7 rounds.
-- **Heal:** 3 perfect boards in a row heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board.
+- **Heal:** 4 perfect boards in a row (was 3) heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board.
 - **Rush:** after 100 moves (average of both players; was 150), every mine attack is worth 5 times as much. It guarantees every round ends.
 - Boards: 6×6 Classic, both players race the same seeded sequence at their own pace.
 
+## The frame (2026-10-30)
+
+Krischan's layout, TETR.IO-clean and symmetrical: **left pole = you, right pole = what's coming at you.**
+
+- **Left pole:** 3 heart segments. Only the first missing one can come back: it fills a quarter per perfect board and beats like a heart (lub-dub, not an ease) while it's tentative.
+- **Right pole, top to bottom:** 16 orange segments (mine bank; the top one blinks if there are more), 6 red (next batch), one solid ice block: dark = none, `#8098B0` = lands in 2 moves, `#7CB3EB` blinking = next move, `#FFFFFF` flash = landing. The block doesn't show *how many* ice are coming yet; a quarter-fill is the planned fallback if play-testing says the count matters.
+- **Footer:** time, name, and the fire meter to the right of the name: `+N` pops and drifts up when you send, bigger and white for a counter-spike. A projectile flies from your board to the other player's hazard bar.
+
 ## What the bot-vs-bot simulations say
+
+### With the frame's rules (Hard vs Hard, 2026-10-30)
+
+| Counter mode | KO by mines / ice | Median round | Lead swings |
+| --- | --- | --- | --- |
+| **Counter-spike, full (default)** | 98% / 2% | 1:35 | 1.5 |
+| Refund 50% | 93% / 7% | 2:57 | 3.7 |
+| Plain net-cancel | 85% / 15% | 3:57 | 6.7 |
+
+Full counter-spikes make rounds short and decisive: every clear always sends at least 4, so mines pile up and whoever falls behind gets buried. Ice rarely ends a round under any of these, because batches of 6 kill first. Worth feeling in play before tuning; the counter mode and every value are sliders in the lab.
+
+Also fixed on the way: a board could lock forever when ice blocked every remaining box (no legal move, so no tick, so no melting), and the bot used to wait forever on ice; it now builds next to ice to thaw it, like a person would.
+
+### Earlier rules (2026-10-30 morning)
 
 ### After the 2026-10-30 changes (Hard vs Hard)
 
@@ -104,10 +128,12 @@ Each preset beats the one below about 85% of the time. A strong player at about 
 
 ## Open questions
 
-- **Sending ice:** Krischan isn't sold on ice being *sent* (from perfect clears and from thawing) yet, and nothing visibly travels from one board to the other: no projectiles. Parked as the last thing to worry about (2026-10-30).
+- **Sending ice:** Krischan isn't sold on ice being *sent* (from perfect clears and from thawing) yet. Mines now have a projectile; ice doesn't.
+- **Counter-spike strength:** full counter makes rounds short and snowbally in simulation; refund mode is the middle ground. Decide by feel.
+- **Ice threat:** ice almost never ends a round with batches of 6. Fine if mines are meant to be the killer; otherwise lower freeze-over or raise ice per perfect clear.
 
 - **Pool freezing:** Krischan's original rule had a backed-up mine pool slowly freeze cells. Not built; to discuss.
-- **Round length:** about 5 minutes between even players since the ice cap. Levers: rush timing, freeze-over count, ice per perfect clear.
+- **Meso / timing:** counter-spikes are the first timing decision (when to clear). Holding an attack to fire later is the next candidate.
 - **Spicy mines:** row, column or diagonal blasts as rare attacks. Version 2 content.
 - **Spread landing** (one mine per unsolved region): built as a toggle; barely changes results in the simulations.
 - **Server:** Cloudflare Durable Objects, one per match, instead of renting a Colyseus VM ([decision 0005](../decisions/0005-cloudflare-for-versus.md), proposed). The economy module is import-free so the same file can run there.

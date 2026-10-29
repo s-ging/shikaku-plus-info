@@ -261,7 +261,7 @@
 			// Ice on its way: the whole board catches a chill instead of a marked cell.
 			if (e.iceIncoming.length) {
 				const soon = Math.min(...e.iceIncoming.map((w) => w.eta));
-				const near = 1 - Math.max(0, soon - 1) / Math.max(1, RULES.iceEta);
+				const near = Math.min(1, Math.max(0, 1 - Math.max(0, soon - 1) / Math.max(1, RULES.iceEta)));
 				c.globalAlpha = 0.06 + 0.1 * near + 0.04 * (e.iceIncoming.length - 1);
 				c.fillStyle = C.ice;
 				c.fillRect(0, 0, this.S, this.S);
@@ -349,6 +349,7 @@
 	function loop(now) {
 		for (const v of views) v.draw(now);
 		renderTimer(now);
+		if (now < iceFlashUntil[0] + 30 || now < iceFlashUntil[1] + 30) { renderPoles(0, 'you'); renderPoles(1, 'them'); }
 		requestAnimationFrame(loop);
 	}
 
@@ -389,7 +390,7 @@
 			case 'forceBreak': return e.spills ? 'icebreaker: ice spills to next board' : 'icebreaker';
 			case 'clear': return `board cleared${e.perfect ? ' perfect' : ''}: ${e.sendMines} mines${e.sendIce ? ` + ${e.sendIce} ice` : ''}${e.wiped ? `, ${e.wiped} waiting mines died with the board` : ''}`;
 			case 'heal': return e.boards ? (e.healed ? `${e.boards} perfect boards in a row: healed a heart` : `${e.boards} perfect boards in a row (hearts already full)`) : e.healed ? `${e.streak}x streak: healed a heart` : `${e.streak}x streak (hearts already full)`;
-			case 'send': return e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
+			case 'send': return e.counter ? `counter-spike: cancelled ${e.cancelled}, sent ${e.pass}${e.rush ? ' (rush)' : ''}` : e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
 			case 'sendIce': return `sent ${e.count} ice`;
 			case 'ko': return e.by === 'ice' ? 'frozen over' : 'out of hearts';
 			default: return null;
@@ -410,6 +411,8 @@
 				else if (e.kind === 'thaw') v.flash('shatter', e.cell, 0.3);
 			}
 			if (e.kind === 'heal' && e.healed) pulseHearts(e.side);
+			if (e.kind === 'send' && e.pass > 0) fire(e.side === 'you' ? 0 : 1, e.pass, !!e.counter);
+			if (e.kind === 'frozen') iceFlashUntil[e.side === 'you' ? 0 : 1] = performance.now() + 260;
 			if (e.kind === 'roundOver') showRoundOver(e);
 			const text = describe(e);
 			if (text) logItems.unshift({ side: e.side, text });
@@ -420,7 +423,7 @@
 	}
 
 	function pulseHearts(side) {
-		const el = $(side === 'you' ? 'you-hearts' : 'them-hearts');
+		const el = $(side === 'you' ? 'you-lives' : 'them-lives');
 		if (!el || REDUCED) return;
 		el.classList.remove('healed');
 		void el.offsetWidth;
@@ -466,36 +469,100 @@
 		if (total) parts.push(`· ${total} queued`);
 		return parts.join(' ');
 	}
+	// —— The two poles: hearts on the left, incoming hazards on the right ——
+	const BANK_SLOTS = 16;
+	const iceFlashUntil = [0, 0];
+	function buildPoles(prefix) {
+		const lives = $(prefix + '-lives');
+		lives.innerHTML = '';
+		for (let i = 0; i < RULES.hearts; i++) {
+			const seg = document.createElement('i');
+			seg.appendChild(Object.assign(document.createElement('span'), { className: 'fill' }));
+			lives.appendChild(seg);
+		}
+		const hz = $(prefix + '-hazards');
+		hz.innerHTML = '';
+		for (let i = 0; i < BANK_SLOTS; i++) hz.appendChild(Object.assign(document.createElement('i'), { className: 'bank' }));
+		for (let i = 0; i < RULES.batchSize; i++) hz.appendChild(Object.assign(document.createElement('i'), { className: 'batch' }));
+		hz.appendChild(Object.assign(document.createElement('i'), { className: 'ice' }));
+		hz.dataset.batch = RULES.batchSize;
+		lives.dataset.hearts = RULES.hearts;
+	}
+	function renderPoles(idx, prefix) {
+		const e = match.sides[idx].econ;
+		const lives = $(prefix + '-lives');
+		const hz = $(prefix + '-hazards');
+		if (Number(lives.dataset.hearts) !== RULES.hearts || Number(hz.dataset.batch) !== RULES.batchSize) buildPoles(prefix);
+		// Hearts fill from the bottom. Only the first missing one can heal: it fills a
+		// step per perfect board and beats like a heart while it's tentative.
+		const canHeal = RULES.healPerfectBoards && (!RULES.maxHealsPerRound || e.heals < RULES.maxHealsPerRound);
+		const segs = [...lives.children].reverse();
+		segs.forEach((seg, i) => {
+			const alive = i < e.hearts;
+			seg.className = alive ? 'on' : '';
+			const fill = seg.firstChild;
+			const healing = !alive && i === e.hearts && canHeal && e.perfectRun > 0;
+			fill.style.height = healing ? `${(100 * e.perfectRun) / RULES.healPerfectBoards}%` : '0';
+			if (healing) seg.classList.add('healing');
+		});
+		// Hazards, top to bottom: orange bank, red next batch, one ice block.
+		const kids = [...hz.children];
+		const bankSegs = kids.slice(0, BANK_SLOTS).reverse(); // fill from the bottom of the orange section
+		const bank = e.bank;
+		bankSegs.forEach((seg, i) => {
+			seg.className = 'bank' + (i < bank ? ' on' : '') + (bank > BANK_SLOTS && i === BANK_SLOTS - 1 ? ' over' : '');
+		});
+		const batchSegs = kids.slice(BANK_SLOTS, BANK_SLOTS + RULES.batchSize).reverse();
+		const next = e.nextBatch;
+		batchSegs.forEach((seg, i) => (seg.className = 'batch' + (i < next ? ' on' : '')));
+		const ice = kids[kids.length - 1];
+		const soon = e.iceIncoming.length ? Math.min(...e.iceIncoming.map((w) => w.eta)) : null;
+		let state = '';
+		if (performance.now() < iceFlashUntil[idx]) state = ' now';
+		else if (soon !== null) state = soon <= 1 ? ' eta1' : ' eta2';
+		ice.className = 'ice' + state;
+		ice.title = e.iceIncoming.length ? `${e.iceIncoming.length} ice on the way` : 'No ice on the way';
+	}
+
+	// —— Attacks: a +N by your name, and a projectile across to the other board ——
+	function fire(idx, count, big) {
+		const prefix = idx === 0 ? 'you' : 'them';
+		const meter = $(prefix + '-fire');
+		meter.textContent = `+${count}`;
+		const pop = Object.assign(document.createElement('span'), { className: 'pop' + (big ? ' big' : ''), textContent: `+${count}` });
+		meter.appendChild(pop);
+		setTimeout(() => pop.remove(), 950);
+		if (REDUCED) return;
+		const from = $(prefix + '-board').getBoundingClientRect();
+		const to = $((idx === 0 ? 'them' : 'you') + '-hazards').getBoundingClientRect();
+		const shot = Object.assign(document.createElement('div'), { className: 'shot' + (big ? ' big' : '') });
+		document.body.appendChild(shot);
+		const x0 = from.left + from.width / 2;
+		const y0 = from.top + from.height / 2;
+		const x1 = to.left + to.width / 2;
+		const y1 = to.top + to.height * 0.3;
+		const lift = -Math.max(40, Math.abs(x1 - x0) * 0.25);
+		shot.animate(
+			[
+				{ transform: `translate(${x0}px, ${y0}px) scale(1)` },
+				{ transform: `translate(${(x0 + x1) / 2}px, ${(y0 + y1) / 2 + lift}px) scale(1.15)`, offset: 0.5 },
+				{ transform: `translate(${x1}px, ${y1}px) scale(0.6)` }
+			],
+			{ duration: 420, easing: 'cubic-bezier(.3,.6,.4,1)' }
+		).onfinish = () => shot.remove();
+		shot.style.left = '-7px';
+		shot.style.top = '-7px';
+	}
+
 	function renderHud() {
 		if (!match) return;
 		const [you, them] = match.sides;
 		$('score-you').textContent = match.score[0];
 		$('score-them').textContent = match.score[1];
-		hearts($('you-hearts'), you.econ);
-		hearts($('them-hearts'), them.econ);
-		$('you-right').innerHTML = '';
-		$('them-right').innerHTML = '';
-		for (const [s, el] of [[you, $('you-right')], [them, $('them-right')]]) {
-			const t = document.createElement('span');
-			t.textContent = rightText(s.econ);
-			el.appendChild(t);
-			const canHeal = RULES.healPerfectBoards && (!RULES.maxHealsPerRound || s.econ.heals < RULES.maxHealsPerRound);
-			if (canHeal && s.econ.perfectRun > 0) {
-				const st = document.createElement('span');
-				st.className = 'streak';
-				st.textContent = `${t.textContent ? ' · ' : ''}Perfect ${s.econ.perfectRun}/${RULES.healPerfectBoards}`;
-				st.title = 'Perfect boards in a row; reaching the target heals a heart';
-				el.appendChild(st);
-			}
-			const inc = s.econ.iceIncoming.length;
-			if (s.econ.ice.length || inc) {
-				const ic = document.createElement('span');
-				ic.className = 'icecount';
-				const soonest = inc ? Math.min(...s.econ.iceIncoming.map((w) => w.eta)) : 0;
-				ic.textContent = `${t.textContent ? ' · ' : ''}Ice ${s.econ.ice.length}/${RULES.freezeOverAt}${inc ? ` (+${inc} in ${Math.max(0, soonest)})` : ''}`;
-				el.appendChild(ic);
-			}
-		}
+		renderPoles(0, 'you');
+		renderPoles(1, 'them');
+		$('you-right').textContent = '';
+		$('them-right').textContent = '';
 		$('them-left').textContent = `Board ${them.boardIndex + 1}`;
 		$('mode-line').textContent = `6×6 · Classic · FT${match.target}${match.rush ? ` · Rush ×${RULES.rushMultiplier}` : ''}`;
 	}
@@ -585,11 +652,14 @@
 		['Match', [
 			{ k: 'hearts', label: 'Hearts', min: 1, max: 6, step: 1 },
 			{ k: 'freezeOverAt', label: 'Freeze-over at', min: 2, max: 8, step: 1, fmt: (v) => `${v} ice` },
+			{ k: 'icebreakAtBoxesLeft', label: 'Icebreaker on last N boxes', min: 0, max: 6, step: 1, fmt: (v) => (v ? String(v) : 'any time') },
 			{ k: 'healPerfectBoards', label: 'Heal after perfect boards', min: 0, max: 8, step: 1, fmt: (v) => (v ? `${v} in a row` : 'off') },
 			{ k: 'maxHealsPerRound', label: 'Max heals per round', min: 0, max: 5, step: 1, fmt: (v) => (v ? String(v) : 'no limit') },
 			{ k: 'rushAfter', label: 'Rush after (moves)', min: 0, max: 300, step: 10, fmt: (v) => (v ? String(v) : 'off') },
 			{ k: 'rushMultiplier', label: 'Rush multiplier', min: 2, max: 20, step: 1, fmt: (v) => `×${v}` },
-			{ k: 'overflow', label: 'Overflow', options: [['netCancel', 'Net-cancel (in flight)'], ['passthrough', 'Passthrough']] }
+			{ k: 'counterSpike', label: 'Counter', options: [['true', 'Counter-spike (cancel bank, send it back)'], ['refund', 'Refund (attack cancels, half comes back)'], ['false', 'Plain net-cancel']] },
+			{ k: 'counterRate', label: 'Counter adds back', min: 0, max: 1, step: 0.25, fmt: (v) => Math.round(v * 100) + '%' },
+			{ k: 'overflow', label: 'Overflow (no counter)', options: [['netCancel', 'Net-cancel'], ['passthrough', 'Passthrough']] }
 		]],
 		['Mines', [
 			{ k: 'clearSend', label: 'Clear sends', min: 1, max: 10, step: 1 },
@@ -640,8 +710,8 @@
 					row.className = 'row toggle';
 					const sel = Object.assign(document.createElement('select'), { id });
 					for (const [v, t] of it.options) sel.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: t }));
-					sel.value = o[it.k];
-					sel.addEventListener('change', () => (o[it.k] = sel.value));
+					sel.value = String(o[it.k]);
+					sel.addEventListener('change', () => (o[it.k] = sel.value === 'true' ? true : sel.value === 'false' ? false : sel.value));
 					row.appendChild(sel);
 				} else {
 					row.className = 'row';
