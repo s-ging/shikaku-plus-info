@@ -144,7 +144,7 @@ export class FFMatch {
 	}
 
 	_tickSide(s, opp, tag, out) {
-		const evs = s.econ.tick(s.landable(), this.rules.spreadLanding ? s.regionOf : null);
+		const evs = s.econ.tick(s.landable(), this.rules.spreadLanding || this.rules.mineCluster ? s.regionOf : null);
 		tag(s, evs);
 		for (const e of evs) if (e.kind === 'mineExplode') tag(s, this._explode(s, e.cell));
 		this._icebreak(s, tag);

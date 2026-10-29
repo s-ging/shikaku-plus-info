@@ -30,14 +30,15 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 | --- | --- |
 | A board clear sends | 4 mines |
 | Mines arrive after | 3 of the receiver's moves |
-| Landing | Up to 6 per move (was 4), on empty non-clue cells |
+| Landing | Up to 6 per move (was 4), on empty non-clue cells, **clustered** (2026-10-30): the batch fills one unsolved box, picked weighted by its open cells squared, then the nearest open cells. It hints at the solution on purpose ([ideas](../prototypes/vs-lab/PARKED.md#2-mines-land-in-clusters-built-minecluster)). |
 | Live mines on a board | At most 6; the rest wait in a pool and drop in as room frees up |
 | Fuse | 3 of your moves |
-| Defuse | Cover the mine with a placed box. No reward beyond surviving. |
+| Defuse | Cover the mine with a placed box. Covering it on its last fuse tick is a **clutch** (a callout, no bonus). |
+| Defuse clear | Each mine defused by the box that finishes the board adds +1 to that clear's attack (2026-10-30). |
 | Explosion | −1 heart, and every box touching the 3×3 blast is removed. Mines that go off on the same move cost **one heart in total** (anti-burst, 2026-10-30); each still blasts. |
 | Your board clears | Its live mines die with it. The red batch is committed and lands on your next board; the orange bank is what your counter-spike eats. |
 
-**The queue.** Everything coming at you is split in two: the **red batch** (what lands on your next move, up to 6; committed, too late to stop) and the **orange bank** (everything after that).
+**The queue.** The hazard bar shows 12 bank slots plus the 6-mine batch (2026-10-30; was 16); the bank keeps counting past 12 and its top slot blinks. Everything coming at you is split in two: the **red batch** (what lands on your next move, up to 6; committed, too late to stop) and the **orange bank** (everything after that).
 
 **Counter-spikes (2026-10-30, Krischan: "that is the sauce").** When you clear a board, it cancels up to 12 mines from your orange bank and adds every cancelled mine to its own attack: cancel 11, send 15. You watch orange pile up, hold your last box, and clear right before it turns red. A gentler "refund" mode (your attack cancels first, half of what it cancels comes back) and plain net-cancel are both selectable in the lab.
 

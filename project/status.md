@@ -29,6 +29,7 @@ Newest items at the top of each list. Tick items off (`[x]`) with the date; neve
 
 ### Done
 
+- [x] 2026-10-30 VS: clustered mine landing, defuse-clear bonus, clutch callout, bank of 12, lockout fix; ideas in [PARKED.md](../prototypes/vs-lab/PARKED.md) ([log](../logs/2026-10-30-vs-clusters-and-clutch.md))
 - [x] 2026-10-30 VS: rule C (a banked pool freezes you), 4-second idle tick, round log export, flatlining heal heart, poles spaced and rounded like cells, harder Impossible with counter timing, Mirror bot ([log](../logs/2026-10-30-vs-rule-c-idle-tick.md))
 - [x] 2026-10-30 VS frame: hearts pole and hazard bar (orange bank, red batch, ice block), fire meter with projectiles, counter-spikes; ice lands in 2 moves and stacks, freeze-over back to 4, batch 6, heal after 4 perfect boards, icebreaker on the last 2 boxes ([log](../logs/2026-10-30-vs-frame-and-counter-spikes.md))
 - [x] 2026-10-30 VS rule tweaks: anti-burst, max 2 ice on the way with a board-wide chill instead of a marked cell, freeze-over 3, rush at 100; name is now just "Shikaku+ VS" ([rules](../versus/fuse-and-frost.md))

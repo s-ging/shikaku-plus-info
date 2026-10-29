@@ -90,6 +90,9 @@ canvas.board { display: block; width: 100%; height: auto; aspect-ratio: 1; touch
 .fire .pop { position: absolute; left: 0; bottom: 100%; font-weight: 600; animation: rise 0.9s ease-out forwards; white-space: nowrap; }
 .fire .pop.big { font-size: 22px; color: #fff; }
 @keyframes rise { from { transform: translateY(6px); opacity: 1; } to { transform: translateY(-34px); opacity: 0; } }
+.frame { position: relative; }
+.callout { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font: 700 22px/1 system-ui, sans-serif; letter-spacing: 0.08em; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6); pointer-events: none; animation: callout 1.1s ease-out forwards; white-space: nowrap; z-index: 3; }
+@keyframes callout { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.9); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%) scale(1); } }
 .shot { position: fixed; width: 14px; height: 14px; border-radius: 3px; background: var(--bank); pointer-events: none; z-index: 5; box-shadow: 0 0 0 3px rgba(240, 160, 64, 0.25); }
 .shot.big { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: reduce) { .lives i.healing .fill, .hazards i { animation: none !important; } .fire .pop { animation-duration: 0.01s; } }
@@ -201,7 +204,7 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 		</section>
 	</main>
 
-	<p class="hint">Drag to place a box, tap one to erase it. Your board only moves when you do. Cover mines to defuse them, build next to ice to thaw it. Clear your board to cancel the orange mines and throw them back, but don't sit on them: a big bank left too long starts freezing you. Stalling doesn't work either; your board ticks every few seconds on its own.</p>
+	<p class="hint">Drag to place a box, tap one to erase it. Your board only moves when you do. Mines land in clumps inside the biggest open box: cover them to defuse them, and defusing with the box that finishes the board adds to your attack. build next to ice to thaw it. Clear your board to cancel the orange mines and throw them back, but don't sit on them: a big bank left too long starts freezing you. Stalling doesn't work either; your board ticks every few seconds on its own.</p>
 	<div class="controls">
 		<div class="seg" id="presets" role="group" aria-label="Bot difficulty"></div>
 		<button class="btn" id="pause">Pause</button>
@@ -215,7 +218,7 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 		</div>
 		<div class="panel">
 			<h3>Rules lab</h3>
-			<p class="note">Left pole: your hearts; a lost heart fills back up, beating, one step per perfect board; it flatlines and drains the moment you redo a box. Right pole: everything coming at you. Orange is the mine bank (a clear counter-spikes it; 4+ sitting there for 6 moves sends you ice), red is the batch landing on your next move, the blue block is ice (slate = 2 moves, light blue blinking = next move, white = landing).</p>
+			<p class="note">Left pole: your hearts; a lost heart fills back up, beating, one step per perfect board; it flatlines and drains the moment you redo a box. Right pole: everything coming at you. Orange is the mine bank (12 slots, exactly what one clear's counter-spike can eat; it keeps counting past 12 and the top blinks; 4+ sitting there for 6 moves sends you ice), red is the batch landing on your next move, the blue block is ice (slate = 2 moves, light blue blinking = next move, white = landing).</p>
 			<div class="groups" id="groups"></div>
 			<div class="tools">
 				<button class="btn" id="t-mines">Send me 4 mines</button>

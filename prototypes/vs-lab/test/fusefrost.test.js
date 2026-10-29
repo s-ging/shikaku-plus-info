@@ -317,3 +317,24 @@ test('icebreaker never leaves you with no legal box (three ice on the last two b
 	e.checkStuckAndForceBreak(s.board(), 2);
 	assert.ok(e.hasIceFreeMove(s.board()), 'a legal box must remain');
 });
+
+test('clustered landing: a batch lands inside one box first, then the nearest cells', () => {
+	const e = p({ mineCluster: true, batchSize: 6, mineCap: 6 });
+	// 6x6: region 0 = left 3x6 (18 cells), region 1 = right 3x6.
+	const regionOf = Array.from({ length: 36 }, (_, c) => (c % 6 < 3 ? 0 : 1));
+	e.pool = 4;
+	e.tick(FREE, regionOf);
+	const regs = new Set(e.mines.map((m) => regionOf[m.cell]));
+	assert.equal(e.mines.length, 4);
+	assert.equal(regs.size, 1);
+});
+
+test('defuse-clear: mines defused by the clearing box add to the attack; clutch is flagged', () => {
+	const e = p({ defuseClearBonus: 1 });
+	e.mines = [{ cell: 0, fuse: 1 }, { cell: 1, fuse: 3 }];
+	const ev = e.onPlacement([0, 1], []);
+	assert.deepEqual(ev.filter((x) => x.kind === 'defuse').map((x) => x.clutch).sort(), [false, true]);
+	const clear = e.onBoardCleared()[0];
+	assert.equal(clear.defuseBonus, 2);
+	assert.equal(clear.sendMines, e.rules.clearSend + 2);
+});

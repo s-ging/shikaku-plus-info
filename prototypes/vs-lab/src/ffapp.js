@@ -424,12 +424,12 @@
 			case 'mineExplode': return e.together > 1 ? `mine exploded with ${e.together - 1} more (one heart lost for all), ${e.hearts} left` : `mine exploded, ${e.hearts} heart${e.hearts === 1 ? '' : 's'} left`;
 			case 'iceBlocked': return 'ice dropped: two already on the way';
 			case 'rectsBlown': return `blast removed ${e.count} rectangle${e.count > 1 ? 's' : ''}`;
-			case 'defuse': return 'defused a mine';
+			case 'defuse': return e.clutch ? 'CLUTCH: defused a mine on its last tick' : 'defused a mine';
 			case 'iceIncoming': return `a chill sets in: ice lands in ${e.eta} moves`;
 			case 'frozen': return 'a cell froze';
 			case 'thaw': return e.source === 'active' ? 'thawed ice, sent it back' : 'ice melted';
 			case 'forceBreak': return e.spills ? 'icebreaker: ice spills to next board' : 'icebreaker';
-			case 'clear': return `board cleared${e.perfect ? ' perfect' : ''}: ${e.sendMines} mines${e.sendIce ? ` + ${e.sendIce} ice` : ''}${e.wiped ? `, ${e.wiped} waiting mines died with the board` : ''}`;
+			case 'clear': return `board cleared${e.perfect ? ' perfect' : ''}${e.defuseBonus ? `, defuse clear +${e.defuseBonus}` : ''}: ${e.sendMines} mines${e.sendIce ? ` + ${e.sendIce} ice` : ''}${e.wiped ? `, ${e.wiped} waiting mines died with the board` : ''}`;
 			case 'heal': return e.boards ? (e.healed ? `${e.boards} perfect boards in a row: healed a heart` : `${e.boards} perfect boards in a row (hearts already full)`) : e.healed ? `${e.streak}x streak: healed a heart` : `${e.streak}x streak (hearts already full)`;
 			case 'send': return e.counter ? `counter-spike: cancelled ${e.cancelled}, sent ${e.pass}${e.rush ? ' (rush)' : ''}` : e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
 			case 'sendIce': return `sent ${e.count} ice`;
@@ -450,10 +450,14 @@
 					shake(v.canvas.parentElement, 'big');
 				} else if (e.kind === 'mineLand' || e.kind === 'frozen') shake(v.canvas.parentElement, 'small');
 				else if (e.kind === 'frozen') v.flash('pulse', e.cell);
-				else if (e.kind === 'defuse') v.flash('ring', e.cell);
+				else if (e.kind === 'defuse') {
+					v.flash('ring', e.cell);
+					if (e.clutch) callout(v, 'CLUTCH');
+				}
 				else if (e.kind === 'forceBreak') v.flash('shatter', e.cell, 1);
 				else if (e.kind === 'thaw') v.flash('shatter', e.cell, 0.3);
 			}
+			if (e.kind === 'clear' && e.defuseBonus && v) callout(v, `DEFUSE CLEAR +${e.defuseBonus}`);
 			if (e.kind === 'heal' && e.healed) pulseHearts(e.side);
 			if (e.kind === 'send' && e.pass > 0) fire(e.side === 'you' ? 0 : 1, e.pass, !!e.counter);
 			if (e.kind === 'frozen') iceFlashUntil[e.side === 'you' ? 0 : 1] = performance.now() + 260;
@@ -466,6 +470,13 @@
 		renderHud();
 	}
 
+	// A word over the board for a moment: CLUTCH, DEFUSE CLEAR +N.
+	function callout(view, text) {
+		const host = view.canvas.parentElement;
+		const el = Object.assign(document.createElement('div'), { className: 'callout', textContent: text });
+		host.appendChild(el);
+		setTimeout(() => el.remove(), REDUCED ? 700 : 1100);
+	}
 	function pulseHearts(side) {
 		const el = $(side === 'you' ? 'you-lives' : 'them-lives');
 		if (!el || REDUCED) return;
@@ -514,7 +525,7 @@
 		return parts.join(' ');
 	}
 	// —— The two poles: hearts on the left, incoming hazards on the right ——
-	const BANK_SLOTS = 16;
+	const BANK_SLOTS = 12; // = counterCap: a full bank is exactly what one counter-spike eats
 	const iceFlashUntil = [0, 0];
 	function buildPoles(prefix) {
 		const lives = $(prefix + '-lives');
@@ -747,6 +758,8 @@
 			{ k: 'maxHealsPerRound', label: 'Max heals per round', min: 0, max: 5, step: 1, fmt: (v) => (v ? String(v) : 'no limit') },
 			{ k: 'rushAfter', label: 'Rush after (moves)', min: 0, max: 300, step: 10, fmt: (v) => (v ? String(v) : 'off') },
 			{ k: 'rushMultiplier', label: 'Rush multiplier', min: 2, max: 20, step: 1, fmt: (v) => `×${v}` },
+			{ k: 'mineCluster', label: 'Mine landing', options: [['true', 'Clustered in the biggest open box'], ['false', 'Scattered']] },
+			{ k: 'defuseClearBonus', label: 'Defuse clear bonus', min: 0, max: 3, step: 1, fmt: (v) => (v ? `+${v} per mine` : 'off') },
 			{ k: 'counterSpike', label: 'Counter', options: [['true', 'Counter-spike (cancel bank, send it back)'], ['refund', 'Refund (attack cancels, half comes back)'], ['false', 'Plain net-cancel']] },
 			{ k: 'counterRate', label: 'Counter adds back', min: 0, max: 1, step: 0.25, fmt: (v) => Math.round(v * 100) + '%' },
 			{ k: 'overflow', label: 'Overflow (no counter)', options: [['netCancel', 'Net-cancel'], ['passthrough', 'Passthrough']] }

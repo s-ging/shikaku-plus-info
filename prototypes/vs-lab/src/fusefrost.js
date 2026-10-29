@@ -46,6 +46,13 @@ export const FF_RULES = {
 	// Rule C (Krischan's original): mines left sitting in your orange bank start to freeze
 	// your board. Every bankFreezeEvery moves with at least bankFreezeMin mines banked,
 	// one ice is queued. Holding your last box to counter-spike has a price.
+	// Mines land clustered in the biggest unsolved box (weighted by open area squared),
+	// spilling to the nearest cells, so one big box can defuse a clump. Reads the
+	// solution on purpose: Krischan, 2026-10-30, a hint that rewards intuition is fine.
+	mineCluster: true,
+	// Defuse-clear: each mine defused by the box that finishes the board adds this many
+	// mines to the clear's attack. Flat, never a multiplier (counter-spikes are big already).
+	defuseClearBonus: 1,
 	bankFreezeEvery: 6, // 0 = off
 	// Anti-stall: a board with no move for this long ticks anyway. Off: Krischan didn't
 	// like it in play (2026-10-30). Kept as a lab slider.
@@ -97,6 +104,7 @@ export class FFPlayer {
 		this.perfectRun = 0;
 		this.heals = 0;
 		this._bankCold = 0;
+		this._defusedThisMove = 0;
 		this.outMines = 0;
 		this.outIce = 0;
 		this.spill = 0; // icebroken cells waiting for your next board
@@ -139,6 +147,44 @@ export class FFPlayer {
 		const occ = this._occupied();
 		const pool = free.filter((c) => !occ.has(c) && !extraBlocked.has(c));
 		return pool.length ? pool[this.rng.nextInt(pool.length)] : -1;
+	}
+
+	/** Up to n landing cells: a clump in one big unsolved box, then the nearest cells around it. */
+	_clusterCells(free, regionOf, n) {
+		const occ = new Set([...this.mines.map((m) => m.cell), ...this.ice.map((f) => f.cell)]);
+		const open = free.filter((c) => !occ.has(c));
+		if (!open.length || n <= 0) return [];
+		const byRegion = new Map();
+		for (const c of open) {
+			const k = regionOf[c];
+			if (!byRegion.has(k)) byRegion.set(k, []);
+			byRegion.get(k).push(c);
+		}
+		// Anchor box: weighted by open cells squared, so big boxes draw the clump.
+		const regions = [...byRegion.entries()];
+		let roll = this.rng.nextInt(regions.reduce((s, [, cs]) => s + cs.length * cs.length, 0));
+		let anchor = regions[0];
+		for (const rg of regions) {
+			roll -= rg[1].length * rg[1].length;
+			if (roll < 0) {
+				anchor = rg;
+				break;
+			}
+		}
+		const N = Math.round(Math.sqrt(regionOf.length));
+		const ax = anchor[1].reduce((s, c) => s + (c % N), 0) / anchor[1].length;
+		const ay = anchor[1].reduce((s, c) => s + Math.floor(c / N), 0) / anchor[1].length;
+		const dist = (c) => Math.abs((c % N) - ax) + Math.abs(Math.floor(c / N) - ay);
+		const inside = this._shuffle([...anchor[1]]);
+		const rest = open.filter((c) => regionOf[c] !== anchor[0]).sort((a, b) => dist(a) - dist(b));
+		return [...inside, ...rest].slice(0, n);
+	}
+	_shuffle(a) {
+		for (let i = a.length - 1; i > 0; i--) {
+			const j = this.rng.nextInt(i + 1);
+			[a[i], a[j]] = [a[j], a[i]];
+		}
+		return a;
 	}
 
 	// —— Receiving ——
@@ -213,9 +259,12 @@ export class FFPlayer {
 			}
 		}
 		const covered = new Set(rectCells);
+		this._defusedThisMove = 0;
 		for (let i = this.mines.length - 1; i >= 0; i--) {
 			if (!covered.has(this.mines[i].cell)) continue;
-			ev.push({ kind: 'defuse', cell: this.mines[i].cell });
+			// Clutch: covered on its very last fuse tick (it would have gone off this move).
+			ev.push({ kind: 'defuse', cell: this.mines[i].cell, clutch: this.mines[i].fuse === 1 });
+			this._defusedThisMove++;
 			this.mines.splice(i, 1);
 			this.stats.defused++;
 		}
@@ -247,7 +296,9 @@ export class FFPlayer {
 	onBoardCleared() {
 		const r = this.rules;
 		const perfect = this.doOversThisBoard === 0;
-		this.outMines += r.clearSend;
+		const defuseBonus = (r.defuseClearBonus || 0) * this._defusedThisMove;
+		this._defusedThisMove = 0;
+		this.outMines += r.clearSend + defuseBonus;
 		if (perfect) {
 			this.outIce += r.perfectSendsIce;
 			this.stats.perfects++;
@@ -272,7 +323,7 @@ export class FFPlayer {
 		const wiped = (r.clearWipesPool ? this.pool : 0) + (r.clearWipesIncoming ? this.incomingTotal : 0);
 		if (r.clearWipesPool) this.pool = 0;
 		if (r.clearWipesIncoming) this.incoming = [];
-		return [{ kind: 'clear', wiped, perfect, perfectRun: this.perfectRun, sendMines: r.clearSend, sendIce: perfect ? r.perfectSendsIce : 0 }, ...ev];
+		return [{ kind: 'clear', wiped, perfect, perfectRun: this.perfectRun, sendMines: r.clearSend + defuseBonus, defuseBonus, sendIce: perfect ? r.perfectSendsIce : 0 }, ...ev];
 	}
 
 	drainOut() {
@@ -333,6 +384,14 @@ export class FFPlayer {
 			let n = Math.min(this.pool, room, r.batchSize);
 			const usedRegions = new Set(this.mines.map((m) => regionOf?.[m.cell]));
 			let landed = 0;
+			if (r.mineCluster && regionOf && !r.spreadLanding) {
+				for (const cell of this._clusterCells(free, regionOf, n)) {
+					this.mines.push({ cell, fuse: r.mineFuse });
+					ev.push({ kind: 'mineLand', cell });
+					landed++;
+				}
+				n = 0;
+			}
 			while (landed < n) {
 				let block = new Set();
 				if (r.spreadLanding && regionOf) {
