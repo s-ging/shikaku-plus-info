@@ -32,3 +32,7 @@ Build the agreed last round: rule C as the everyday ice source, an idle tick aga
 ---
 
 Authored by Claude; who was typing on Krischan's side wasn't confirmed (shared account).
+
+## Follow-up, same morning
+
+Krischan played Mirror twice and won both rounds (logs shared as JSON). He didn't like the idle tick, so it's now off by default (`idleTickSecs` 0, slider kept). Mirror now moves in lockstep, once per move of his, instead of at a measured average pace. Rule C never fired in either log: his bank never held 4+ mines for 6 moves.

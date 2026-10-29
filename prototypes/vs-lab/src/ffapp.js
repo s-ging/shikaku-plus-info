@@ -378,15 +378,25 @@
 			moveNo[0]++;
 			youTimes.push(now);
 			if (youTimes.length > 12) youTimes.shift();
-			if (BOT.mirror && youTimes.length >= 4) BOT.secs = Math.min(4, Math.max(0.5, (youTimes[youTimes.length - 1] - youTimes[0]) / (youTimes.length - 1) / 1000));
+			if (youTimes.length >= 2) BOT.measured = (youTimes[youTimes.length - 1] - youTimes[0]) / (youTimes.length - 1) / 1000;
+			// Mirror moves in lockstep: one bot move for each of yours, a beat after it.
+			if (BOT.mirror) botMove(0.2 + Math.random() * 0.25);
 		}
 		if (!r.moved && r.denied && action.type === 'place')
 			views[0].ghost = { r: new Rect(action.ax, action.ay, action.bx, action.by), ice: r.denied === 'ice', start: performance.now() };
 		handle(r.events);
 	}
+	function botMove(delay) {
+		setTimeout(() => {
+			if (paused || !match || match.roundOver) return;
+			const r = match.act(1, bot.decide(match.sides[1]));
+			if (r.moved) moveNo[1]++;
+			handle(r.events);
+		}, delay * 1000);
+	}
 	function scheduleBot() {
 		clearTimeout(botTimer);
-		if (paused || !match || match.roundOver) return;
+		if (paused || !match || match.roundOver || BOT.mirror) return;
 		const jitter = 0.6 + Math.random() * 0.8;
 		const side = match.sides[1];
 		const reading = side.boardIndex !== botBoard ? BOT.read : 0;
@@ -403,7 +413,7 @@
 			}
 			handle(r.events);
 			scheduleBot();
-		}, (BOT.secs * jitter + (BOT.mirror ? 0 : reading)) * 1000);
+		}, (BOT.secs * jitter + reading) * 1000);
 	}
 
 	// —— Events ——

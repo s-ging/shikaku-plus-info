@@ -266,6 +266,6 @@ export const BOT_PRESETS = {
 	hard: { label: 'Hard', secs: 1.9, read: 2.2, misplay: 0.1, tiltPerMine: 0.04, tiltPerHeart: 0.05, defuseFirst: 0.7 },
 	expert: { label: 'Expert', secs: 1.4, read: 1.5, misplay: 0.06, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.85, counterHold: 1 },
 	impossible: { label: 'Impossible', secs: 1.0, read: 0.9, misplay: 0.03, tiltPerMine: 0.015, tiltPerHeart: 0.02, defuseFirst: 0.97, counterHold: 2 },
-	// Mirror: plays at YOUR measured pace (the lab sets secs live), Expert decisions.
+	// Mirror: moves in lockstep with you (one move per your move, ~0.3s after), Expert-plus decisions.
 	mirror: { label: 'Mirror', secs: 2.0, read: 1.2, misplay: 0.05, tiltPerMine: 0.03, tiltPerHeart: 0.03, defuseFirst: 0.9, counterHold: 1, mirror: true }
 };

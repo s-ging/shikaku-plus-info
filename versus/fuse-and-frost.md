@@ -21,7 +21,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 
 - There is no wall clock. Each player's board ticks once per move: a placement or an erase. Tapping an empty cell is not a move. Moves come roughly every 1.5 to 1.8 seconds in real play.
 - Incoming mines and ice land when you move (Tetris-style), so a player who stops to think gets a short grace.
-- **Idle tick (2026-10-30):** if you make no move for 4 seconds, your board ticks anyway. Stalling to dodge a landing doesn't work. The client runs this timer; the match server will have to as well.
+- **Idle tick: tried and dropped (2026-10-30).** A 4-second idle tick was built; Krischan didn't like it in play, so it's off (still a lab slider). Stalling only delays your own landings while the opponent keeps clearing; a real match still needs an AFK timeout on the server.
 - A move resolves in order: your box goes down (defusing what it covers, thawing ice beside it); if that finished the board, your attack goes out and cancels mines still flying at you; then your board ticks.
 
 ## Mines
@@ -118,9 +118,9 @@ From `prototypes/vs-lab/test/ffsim.js` (bots at about 1.6 seconds per move that 
 | Hard | 1.9 | 2.2s | 10% | 4% / 5% | 70% |
 | Expert | 1.4 | 1.5s | 6% | 3% / 4% | 85% |
 | Impossible | 1.0 | 0.9s | 3% | 1.5% / 2% | 97% |
-| Mirror | your pace | (in your pace) | 5% | 3% / 3% | 90% |
+| Mirror | lockstep: one move per yours, about 0.3s after | none | 5% | 3% / 3% | 90% |
 
-Expert holds its last box for 1 turn and Impossible for 2 when its orange bank has 4 or more and nothing is about to land: counter-spike timing. **Mirror** measures your last dozen moves and plays at exactly that speed, so only decisions separate you (Krischan's own lost bot worked this way: "if you're at 2pps, the bot is 2pps").
+Expert holds its last box for 1 turn and Impossible for 2 when its orange bank has 4 or more and nothing is about to land: counter-spike timing. **Mirror** moves once for every move you make, about 0.3s after you, so your pace is its pace by construction and only decisions separate you (Krischan's own lost bot worked this way: "if you're at 2pps, the bot is 2pps"). The first version measured your average pace over your last dozen moves instead; it swung with bursts (0.7s a move in one of Krischan's logs, against his real 1.35s) and he beat it, so it became lockstep.
 
 Simulated against a strong human stand-in (2s a move, 2.5s to read a board), 2026-10-30 with rule C and the idle tick: Easy 15% bot wins, Normal 36%, Hard 39%, Expert 74%, **Impossible 89%**, Mirror 69%. Rounds against Impossible run under a minute; ice ends about a quarter of them now that rule C exists. Each preset beats the one below 65 to 78% of the time.
 

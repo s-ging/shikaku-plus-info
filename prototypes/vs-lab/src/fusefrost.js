@@ -47,8 +47,9 @@ export const FF_RULES = {
 	// your board. Every bankFreezeEvery moves with at least bankFreezeMin mines banked,
 	// one ice is queued. Holding your last box to counter-spike has a price.
 	bankFreezeEvery: 6, // 0 = off
-	// Anti-stall: a board with no move for this long ticks anyway (the clients run it).
-	idleTickSecs: 4,
+	// Anti-stall: a board with no move for this long ticks anyway. Off: Krischan didn't
+	// like it in play (2026-10-30). Kept as a lab slider.
+	idleTickSecs: 0,
 	bankFreezeMin: 4,
 	icebreakAtBoxesLeft: 2, // the icebreaker only helps on your last N boxes
 	icebreakPerMove: 1, // and breaks at most this many cells per move

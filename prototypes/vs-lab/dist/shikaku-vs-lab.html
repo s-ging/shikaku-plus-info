@@ -1493,8 +1493,9 @@ const FF_RULES = {
 	// your board. Every bankFreezeEvery moves with at least bankFreezeMin mines banked,
 	// one ice is queued. Holding your last box to counter-spike has a price.
 	bankFreezeEvery: 6, // 0 = off
-	// Anti-stall: a board with no move for this long ticks anyway (the clients run it).
-	idleTickSecs: 4,
+	// Anti-stall: a board with no move for this long ticks anyway. Off: Krischan didn't
+	// like it in play (2026-10-30). Kept as a lab slider.
+	idleTickSecs: 0,
 	bankFreezeMin: 4,
 	icebreakAtBoxesLeft: 2, // the icebreaker only helps on your last N boxes
 	icebreakPerMove: 1, // and breaks at most this many cells per move
@@ -2154,7 +2155,7 @@ const BOT_PRESETS = {
 	hard: { label: 'Hard', secs: 1.9, read: 2.2, misplay: 0.1, tiltPerMine: 0.04, tiltPerHeart: 0.05, defuseFirst: 0.7 },
 	expert: { label: 'Expert', secs: 1.4, read: 1.5, misplay: 0.06, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.85, counterHold: 1 },
 	impossible: { label: 'Impossible', secs: 1.0, read: 0.9, misplay: 0.03, tiltPerMine: 0.015, tiltPerHeart: 0.02, defuseFirst: 0.97, counterHold: 2 },
-	// Mirror: plays at YOUR measured pace (the lab sets secs live), Expert decisions.
+	// Mirror: moves in lockstep with you (one move per your move, ~0.3s after), Expert-plus decisions.
 	mirror: { label: 'Mirror', secs: 2.0, read: 1.2, misplay: 0.05, tiltPerMine: 0.03, tiltPerHeart: 0.03, defuseFirst: 0.9, counterHold: 1, mirror: true }
 };
 
@@ -2540,15 +2541,25 @@ const BOT_PRESETS = {
 			moveNo[0]++;
 			youTimes.push(now);
 			if (youTimes.length > 12) youTimes.shift();
-			if (BOT.mirror && youTimes.length >= 4) BOT.secs = Math.min(4, Math.max(0.5, (youTimes[youTimes.length - 1] - youTimes[0]) / (youTimes.length - 1) / 1000));
+			if (youTimes.length >= 2) BOT.measured = (youTimes[youTimes.length - 1] - youTimes[0]) / (youTimes.length - 1) / 1000;
+			// Mirror moves in lockstep: one bot move for each of yours, a beat after it.
+			if (BOT.mirror) botMove(0.2 + Math.random() * 0.25);
 		}
 		if (!r.moved && r.denied && action.type === 'place')
 			views[0].ghost = { r: new Rect(action.ax, action.ay, action.bx, action.by), ice: r.denied === 'ice', start: performance.now() };
 		handle(r.events);
 	}
+	function botMove(delay) {
+		setTimeout(() => {
+			if (paused || !match || match.roundOver) return;
+			const r = match.act(1, bot.decide(match.sides[1]));
+			if (r.moved) moveNo[1]++;
+			handle(r.events);
+		}, delay * 1000);
+	}
 	function scheduleBot() {
 		clearTimeout(botTimer);
-		if (paused || !match || match.roundOver) return;
+		if (paused || !match || match.roundOver || BOT.mirror) return;
 		const jitter = 0.6 + Math.random() * 0.8;
 		const side = match.sides[1];
 		const reading = side.boardIndex !== botBoard ? BOT.read : 0;
@@ -2565,7 +2576,7 @@ const BOT_PRESETS = {
 			}
 			handle(r.events);
 			scheduleBot();
-		}, (BOT.secs * jitter + (BOT.mirror ? 0 : reading)) * 1000);
+		}, (BOT.secs * jitter + reading) * 1000);
 	}
 
 	// —— Events ——
