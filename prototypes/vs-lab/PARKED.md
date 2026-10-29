@@ -21,6 +21,7 @@ Krischan asked to bias mines toward larger boxes, so one big box can defuse seve
 - **It reads the solution on purpose.** Where mines land hints where the big boxes are. Krischan, 2026-10-30: "i wouldn't mind giving away the solution if it rewards intuition and skill rather than pure 'random rng'".
 - **Turning it off:** set `mineCluster: false` for scattered landing. Spread landing (`spreadLanding`, at most one mine per box) overrides clustering when it's on.
 - **Simulation** (strong human stand-in vs each preset, 2026-10-30): rounds against Mirror went from a median of 1:48 to 2:48, and lead changes from 1.7 to 3.9 per round. More back-and-forth, because mines are now defusable. Win rates barely moved; Impossible still wins 94%.
+- **Relax it a little (Krischan, 2026-10-30, parked):** "maybe 1-2 stray mines here and there but it does steer my eyes into where I should be looking". Likely change: 1 or 2 mines per batch land scattered, the rest clustered.
 - **Open:** a cap of live mines at the number of unplaced boxes was the other fix considered; parked unless clusters aren't enough.
 
 ## 3. Fewer 2-givens (parked, later)
@@ -40,11 +41,14 @@ Each mine defused by the box that finishes the board adds **+1** to that clear's
   - Clusters land in the biggest open box.
   - So you can leave your biggest box open on purpose, let the batch land inside it, then place that box last to defuse the clump and finish the board in one swing.
   - That's a setup, a timing read and a payoff, like holding a T-slot in Tetris.
+- **Krischan, 2026-10-30:** "not my style, but it's a very FUN concept. it can stay".
 - **Still open:** does it feel plannable in play? Should defusing together with a counter-spike stack, or is that too much?
 
 ## 5. Clutch defuse (built, as a moment)
 
 Covering a mine on its very last fuse tick, the move it would have gone off. Krischan: "YES THE CLUTCH IS GREAT", but it's more "is the player crazy enough to do it" than textbook play, so it gets a "CLUTCH" callout and a log line, not a mechanical bonus.
+
+**Feedback (Krischan, 2026-10-30):** it said CLUTCH on a move where he "bombed the fuck out and lost hearts". The flag is technically right, because that one mine was saved, but other mines went off on the same move, so it read as a lie. Refine later. Likely fix: no callout on a move where anything explodes, or only call it a clutch when every mine on its last tick was covered.
 
 **Can the game read it, and is it expensive?** It's free. Each mine already carries its `fuse` count, and `FFPlayer.onPlacement` already loops over the mines a placement covers. A clutch is a defused mine with `fuse === 1`: one comparison per defused mine, with no search and no solver. It's a flag on the existing event, `{ kind: 'defuse', cell, clutch: true }`, so a match server can read it the same way.
 
