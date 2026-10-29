@@ -43,6 +43,13 @@ export const FF_RULES = {
 	perPlacementThawCap: 2,
 	thawSendsIce: true, // ice you thaw by building is sent back
 	forceBreakSendsIce: false,
+	// Rule C (Krischan's original): mines left sitting in your orange bank start to freeze
+	// your board. Every bankFreezeEvery moves with at least bankFreezeMin mines banked,
+	// one ice is queued. Holding your last box to counter-spike has a price.
+	bankFreezeEvery: 6, // 0 = off
+	// Anti-stall: a board with no move for this long ticks anyway (the clients run it).
+	idleTickSecs: 4,
+	bankFreezeMin: 4,
 	icebreakAtBoxesLeft: 2, // the icebreaker only helps on your last N boxes
 	icebreakPerMove: 1, // and breaks at most this many cells per move
 	icebreakSpills: true, // broken ice isn't destroyed: it returns on your next board
@@ -88,6 +95,7 @@ export class FFPlayer {
 		this.streak = 0;
 		this.perfectRun = 0;
 		this.heals = 0;
+		this._bankCold = 0;
 		this.outMines = 0;
 		this.outIce = 0;
 		this.spill = 0; // icebroken cells waiting for your next board
@@ -339,6 +347,14 @@ export class FFPlayer {
 			}
 			this.pool -= landed;
 		}
+
+		// 3b) Rule C: a bank left sitting too long freezes over
+		if (r.bankFreezeEvery && this.bank >= r.bankFreezeMin) {
+			if (++this._bankCold >= r.bankFreezeEvery) {
+				this._bankCold = 0;
+				ev.push({ kind: 'bankFreeze', bank: this.bank }, ...this.receiveIce(1, free));
+			}
+		} else this._bankCold = 0;
 
 		// 4) Ice in flight
 		for (const w of this.iceIncoming) w.eta--;

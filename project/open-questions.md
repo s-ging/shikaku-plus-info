@@ -5,7 +5,6 @@ For Krischan. Move each answer into the page where it belongs, then delete the q
 ## Product
 
 - **Offline mode:** what did the lost work cover? The current app already boots and plays without a network (sign-in is best-effort, puzzles are generated locally). Was it about accounts, sync queues, the Android build, something else?
-- **Versus pool freezing:** should a backed-up mine pool slowly freeze cells, as in the original rulebook?
 - **Versus round length:** about 5 minutes between even players since the 2026-10-30 tweaks (mines and ice now split KOs evenly). Is that the right length?
 - **Sending ice:** keep ice as an attack at all, and should something visibly fly between boards? Parked by Krischan for later.
 - **Versus launch shape:** bots first, friends-only rooms, or matchmaking?

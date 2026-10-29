@@ -110,6 +110,7 @@ export class FFMatch {
 		const out = [];
 		const tag = (side, evs) => evs.forEach((e) => out.push({ side: side.name, ...e }));
 
+		if (!action) return { moved: false, events: [] };
 		const a = this._apply(s, action);
 		if (!a.moved) return { moved: false, events: [], denied: a.denied };
 		tag(s, a.events);
@@ -128,16 +129,28 @@ export class FFMatch {
 			out.push({ side: s.name, kind: 'newBoard', index: s.boardIndex });
 		}
 		this._route(s, opp, out);
+		this._tickSide(s, opp, tag, out);
+		return { moved: true, events: out, placed: a.placed };
+	}
 
+	/** One clock step for side i without a move: the idle tick that stops stalling. */
+	idleTick(i) {
+		if (this.over || this.roundOver) return { events: [] };
+		const s = this.sides[i];
+		const out = [{ side: s.name, kind: 'idleTick' }];
+		const tag = (side, evs) => evs.forEach((e) => out.push({ side: side.name, ...e }));
+		this._tickSide(s, this.sides[1 - i], tag, out);
+		return { events: out };
+	}
+
+	_tickSide(s, opp, tag, out) {
 		const evs = s.econ.tick(s.landable(), this.rules.spreadLanding ? s.regionOf : null);
 		tag(s, evs);
 		for (const e of evs) if (e.kind === 'mineExplode') tag(s, this._explode(s, e.cell));
 		this._icebreak(s, tag);
 		this._route(s, opp, out);
-
 		this._trackLead();
 		this._checkKO(out);
-		return { moved: true, events: out, placed: a.placed };
 	}
 
 	_icebreak(s, tag) {
@@ -217,9 +230,26 @@ export class TiltBot extends ReplayBot {
 		this.baseMisplay = opts.misplay ?? 0.12;
 		this.tiltPerMine = opts.tiltPerMine ?? 0.04;
 		this.tiltPerHeart = opts.tiltPerHeart ?? 0.06;
+		this.counterHold = opts.counterHold ?? 0; // waits this many turns on its last box to grow a counter-spike
+		this._holdBoard = -1;
+		this._holdLeft = 0;
 	}
 	decide(side) {
 		const e = side.econ;
+		// Counter timing: on the last box, with mines banked and nothing about to land,
+		// wait a little so the bank grows, then clear into a bigger counter-spike.
+		if (this.counterHold) {
+			if (this._holdBoard !== side.boardIndex) {
+				this._holdBoard = side.boardIndex;
+				this._holdLeft = this.counterHold;
+			}
+			const placed = new Set(side.rects.map((r) => `${r.x1},${r.y1},${r.x2},${r.y2}`));
+			const left = side.puzzle.layout.filter((r) => !placed.has(`${r.x1},${r.y1},${r.x2},${r.y2}`)).length;
+			if (left === 1 && e.bank >= 4 && e.nextBatch === 0 && e.mines.length === 0 && this._holdLeft > 0) {
+				this._holdLeft--;
+				return null;
+			}
+		}
 		this.misplay = Math.min(0.9, this.baseMisplay + this.tiltPerMine * e.mines.length + this.tiltPerHeart * (e.rules.hearts - e.hearts));
 		return super.decide(side);
 	}
@@ -234,6 +264,8 @@ export const BOT_PRESETS = {
 	easy: { label: 'Easy', secs: 3.2, read: 4, misplay: 0.24, tiltPerMine: 0.06, tiltPerHeart: 0.08, defuseFirst: 0.35 },
 	normal: { label: 'Normal', secs: 2.4, read: 3, misplay: 0.15, tiltPerMine: 0.05, tiltPerHeart: 0.07, defuseFirst: 0.55 },
 	hard: { label: 'Hard', secs: 1.9, read: 2.2, misplay: 0.1, tiltPerMine: 0.04, tiltPerHeart: 0.05, defuseFirst: 0.7 },
-	expert: { label: 'Expert', secs: 1.4, read: 1.5, misplay: 0.06, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.85 },
-	impossible: { label: 'Impossible', secs: 1.1, read: 1.1, misplay: 0.05, tiltPerMine: 0.025, tiltPerHeart: 0.03, defuseFirst: 0.92 }
+	expert: { label: 'Expert', secs: 1.4, read: 1.5, misplay: 0.06, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.85, counterHold: 1 },
+	impossible: { label: 'Impossible', secs: 1.0, read: 0.9, misplay: 0.03, tiltPerMine: 0.015, tiltPerHeart: 0.02, defuseFirst: 0.97, counterHold: 2 },
+	// Mirror: plays at YOUR measured pace (the lab sets secs live), Expert decisions.
+	mirror: { label: 'Mirror', secs: 2.0, read: 1.2, misplay: 0.05, tiltPerMine: 0.03, tiltPerHeart: 0.03, defuseFirst: 0.9, counterHold: 1, mirror: true }
 };

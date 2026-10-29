@@ -14,6 +14,12 @@
 	let roundStart = performance.now();
 	let pausedAt = 0;
 	const logItems = [];
+	// Round log (for "Copy round log"): every event with time, side and that side's move number.
+	let roundLog = [];
+	let lastRoundLog = null;
+	const moveNo = [0, 0];
+	let lastYouTick = performance.now();
+	const youTimes = []; // your recent move timestamps, for the Mirror bot
 
 	let C = {};
 	function readColors() {
@@ -42,6 +48,11 @@
 			this.dpr = Math.max(1, window.devicePixelRatio || 1);
 			this.canvas.width = Math.round(this.S * this.dpr);
 			this.canvas.height = Math.round(this.S * this.dpr);
+			// Poles sit one cell-gap away from the cells and share their corner radius.
+			const f = this.canvas.parentElement.style;
+			f.setProperty('--fgap', `${this.gap / 2}px`);
+			f.setProperty('--pinset', `${this.gap / 2}px`);
+			f.setProperty('--prad', `${Math.max(4, this.k * 0.08)}px`);
 		}
 		get N() {
 			return this.side.N;
@@ -349,6 +360,10 @@
 	function loop(now) {
 		for (const v of views) v.draw(now);
 		renderTimer(now);
+		if (match && !paused && !match.roundOver && now - lastYouTick >= RULES.idleTickSecs * 1000 && RULES.idleTickSecs) {
+			lastYouTick = now;
+			handle(match.idleTick(0).events);
+		}
 		if (now < iceFlashUntil[0] + 30 || now < iceFlashUntil[1] + 30) { renderPoles(0, 'you'); renderPoles(1, 'them'); }
 		requestAnimationFrame(loop);
 	}
@@ -357,6 +372,14 @@
 	function youMove(action) {
 		if (!match || match.roundOver) return;
 		const r = match.act(0, action);
+		if (r.moved) {
+			const now = performance.now();
+			lastYouTick = now;
+			moveNo[0]++;
+			youTimes.push(now);
+			if (youTimes.length > 12) youTimes.shift();
+			if (BOT.mirror && youTimes.length >= 4) BOT.secs = Math.min(4, Math.max(0.5, (youTimes[youTimes.length - 1] - youTimes[0]) / (youTimes.length - 1) / 1000));
+		}
 		if (!r.moved && r.denied && action.type === 'place')
 			views[0].ghost = { r: new Rect(action.ax, action.ay, action.bx, action.by), ice: r.denied === 'ice', start: performance.now() };
 		handle(r.events);
@@ -370,9 +393,17 @@
 		botBoard = side.boardIndex;
 		botTimer = setTimeout(() => {
 			if (paused || match.roundOver) return;
-			handle(match.act(1, bot.decide(match.sides[1])).events);
+			const r = match.act(1, bot.decide(match.sides[1]));
+			if (r.moved) moveNo[1]++;
+			else if (!bot._idleAt) bot._idleAt = performance.now();
+			if (r.moved) bot._idleAt = 0;
+			else if (RULES.idleTickSecs && performance.now() - bot._idleAt >= RULES.idleTickSecs * 1000) {
+				bot._idleAt = performance.now();
+				handle(match.idleTick(1).events);
+			}
+			handle(r.events);
 			scheduleBot();
-		}, (BOT.secs * jitter + reading) * 1000);
+		}, (BOT.secs * jitter + (BOT.mirror ? 0 : reading)) * 1000);
 	}
 
 	// —— Events ——
@@ -392,12 +423,15 @@
 			case 'heal': return e.boards ? (e.healed ? `${e.boards} perfect boards in a row: healed a heart` : `${e.boards} perfect boards in a row (hearts already full)`) : e.healed ? `${e.streak}x streak: healed a heart` : `${e.streak}x streak (hearts already full)`;
 			case 'send': return e.counter ? `counter-spike: cancelled ${e.cancelled}, sent ${e.pass}${e.rush ? ' (rush)' : ''}` : e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
 			case 'sendIce': return `sent ${e.count} ice`;
+			case 'bankFreeze': return `bank of ${e.bank} sat too long: ice on the way`;
 			case 'ko': return e.by === 'ice' ? 'frozen over' : 'out of hearts';
 			default: return null;
 		}
 	}
 	function handle(events) {
 		for (const e of events || []) {
+			const si = e.side === 'you' ? 0 : e.side === 'them' ? 1 : -1;
+			roundLog.push({ t: Math.round(performance.now() - roundStart), move: si >= 0 ? moveNo[si] : null, ...e });
 			const v = views[e.side === 'you' ? 0 : e.side === 'them' ? 1 : -1];
 			if (v) {
 				if (e.kind === 'newBoard') v.flashes = [];
@@ -501,7 +535,8 @@
 			const alive = i < e.hearts;
 			seg.className = alive ? 'on' : '';
 			const fill = seg.firstChild;
-			const healing = !alive && i === e.hearts && canHeal && e.perfectRun > 0;
+			// The beat stops (and the fill drains) the moment this board can't be perfect.
+			const healing = !alive && i === e.hearts && canHeal && e.perfectRun > 0 && e.doOversThisBoard === 0;
 			fill.style.height = healing ? `${(100 * e.perfectRun) / RULES.healPerfectBoards}%` : '0';
 			if (healing) seg.classList.add('healing');
 		});
@@ -576,6 +611,7 @@
 
 	function showRoundOver(e) {
 		pausedAt = performance.now();
+		lastRoundLog = buildRoundLog(e);
 		const youWon = e.winner === 0;
 		$('ov-title').textContent = match.over ? (youWon ? 'Match won' : 'Match lost') : e.winner === null ? 'Double KO' : youWon ? 'Round won' : 'Round lost';
 		const how = e.by === 'ice' ? 'froze over' : 'ran out of hearts';
@@ -591,8 +627,47 @@
 		startRound(`round ${match.round}: both boards reset`);
 	});
 
+	function buildRoundLog(end) {
+		const diff = {};
+		for (const k of Object.keys(RULES)) if (RULES[k] !== FF_RULES[k]) diff[k] = RULES[k];
+		const { label, ...botStats } = BOT;
+		return {
+			lab: 'Shikaku+ VS lab',
+			at: new Date().toISOString(),
+			bot: { preset: presetKey, label, ...botStats },
+			seed: match.seed,
+			round: match.round,
+			score: [...match.score],
+			result: end ? { winner: end.winner === 0 ? 'you' : end.winner === 1 ? 'bot' : 'double KO', by: end.by } : 'in progress',
+			ms: Math.round((end ? pausedAt : performance.now()) - roundStart),
+			moves: { you: moveNo[0], bot: moveNo[1] },
+			end: match.sides.map((s) => ({ side: s.name, board: s.boardIndex + 1, cleared: s.cleared, hearts: s.econ.hearts, ice: s.econ.ice.length, bank: s.econ.bank })),
+			rulesChanged: diff,
+			events: roundLog
+		};
+	}
+	async function copyText(btn, json, idle) {
+		try {
+			await navigator.clipboard.writeText(json);
+			btn.textContent = 'Copied';
+		} catch {
+			const ta = Object.assign(document.createElement('textarea'), { value: json });
+			ta.style.cssText = 'width:100%;height:160px;margin-top:8px;font:12px monospace;background:var(--cell);color:var(--fg);border:0;border-radius:6px';
+			btn.after(ta);
+			ta.select();
+			btn.textContent = 'Select and copy below';
+		}
+		setTimeout(() => (btn.textContent = idle), 2000);
+	}
+	$('ov-log').addEventListener('click', () => copyText($('ov-log'), JSON.stringify(lastRoundLog || buildRoundLog(null), null, 1), 'Copy round log'));
+	$('t-log').addEventListener('click', () => copyText($('t-log'), JSON.stringify(match.roundOver ? lastRoundLog : buildRoundLog(null), null, 1), 'Copy round log'));
+
 	function startRound(msg) {
 		roundStart = performance.now();
+		lastYouTick = roundStart;
+		roundLog = [];
+		moveNo[0] = moveNo[1] = 0;
+		if (bot) bot._idleAt = 0;
 		botBoard = 0;
 		for (const v of views) v.flashes = [];
 		logItems.unshift({ side: 'match', text: msg });
@@ -611,12 +686,13 @@
 	$('restart').addEventListener('click', newMatch);
 	$('pause').addEventListener('click', () => {
 		paused = !paused;
-		$('pause').textContent = paused ? 'Resume bot' : 'Pause bot';
+		$('pause').textContent = paused ? 'Resume' : 'Pause';
 		if (paused) {
 			pausedAt = performance.now();
 			clearTimeout(botTimer);
 		} else {
 			roundStart += performance.now() - pausedAt;
+			lastYouTick = performance.now();
 			scheduleBot();
 		}
 	});
@@ -625,7 +701,8 @@
 	function setPreset(key) {
 		presetKey = key;
 		Object.assign(BOT, BOT_PRESETS[key]);
-		if (bot) Object.assign(bot, { baseMisplay: BOT.misplay, tiltPerMine: BOT.tiltPerMine, tiltPerHeart: BOT.tiltPerHeart, defuseFirst: BOT.defuseFirst });
+		if (!BOT_PRESETS[key].mirror) delete BOT.mirror;
+		if (bot) Object.assign(bot, { baseMisplay: BOT.misplay, tiltPerMine: BOT.tiltPerMine, tiltPerHeart: BOT.tiltPerHeart, defuseFirst: BOT.defuseFirst, counterHold: BOT.counterHold ?? 0 });
 		for (const b of document.querySelectorAll('#presets button')) b.setAttribute('aria-pressed', String(b.dataset.key === key));
 		buildRules();
 		scheduleBot();
@@ -652,6 +729,9 @@
 		['Match', [
 			{ k: 'hearts', label: 'Hearts', min: 1, max: 6, step: 1 },
 			{ k: 'freezeOverAt', label: 'Freeze-over at', min: 2, max: 8, step: 1, fmt: (v) => `${v} ice` },
+			{ k: 'bankFreezeEvery', label: 'Bank freezes every (moves)', min: 0, max: 20, step: 1, fmt: (v) => (v ? String(v) : 'off') },
+			{ k: 'bankFreezeMin', label: 'Bank freezes at', min: 1, max: 16, step: 1, fmt: (v) => `${v}+ mines` },
+			{ k: 'idleTickSecs', label: 'Idle tick after', min: 0, max: 10, step: 0.5, fmt: (v) => (v ? `${v}s` : 'off') },
 			{ k: 'icebreakAtBoxesLeft', label: 'Icebreaker on last N boxes', min: 0, max: 6, step: 1, fmt: (v) => (v ? String(v) : 'any time') },
 			{ k: 'healPerfectBoards', label: 'Heal after perfect boards', min: 0, max: 8, step: 1, fmt: (v) => (v ? `${v} in a row` : 'off') },
 			{ k: 'maxHealsPerRound', label: 'Max heals per round', min: 0, max: 5, step: 1, fmt: (v) => (v ? String(v) : 'no limit') },
@@ -744,21 +824,7 @@
 		buildRules();
 		renderHud();
 	});
-	$('t-copy').addEventListener('click', async () => {
-		const btn = $('t-copy');
-		const json = JSON.stringify({ rules: RULES, bot: BOT }, null, 2);
-		try {
-			await navigator.clipboard.writeText(json);
-			btn.textContent = 'Copied';
-		} catch {
-			const ta = Object.assign(document.createElement('textarea'), { value: json });
-			ta.style.cssText = 'width:100%;height:160px;margin-top:8px;font:12px monospace;background:var(--cell);color:var(--fg);border:0;border-radius:6px';
-			btn.parentElement.after(ta);
-			ta.select();
-			btn.textContent = 'Select and copy below';
-		}
-		setTimeout(() => (btn.textContent = 'Copy rules JSON'), 2000);
-	});
+	$('t-copy').addEventListener('click', () => copyText($('t-copy'), JSON.stringify({ rules: RULES, bot: BOT }, null, 2), 'Copy rules JSON'));
 
 	window.vsLab = { get match() { return match; }, rules: RULES, bot: BOT };
 	readColors();

@@ -4,6 +4,7 @@ What already happened. Newest first. Use [the template](../templates/log.md), na
 
 | Date | Topic |
 | --- | --- |
+| 2026-10-30 | [VS rule C, idle tick, round log](2026-10-30-vs-rule-c-idle-tick.md) |
 | 2026-10-30 | [VS frame and counter-spikes](2026-10-30-vs-frame-and-counter-spikes.md) |
 | 2026-10-30 | [VS rule tweaks and the name](2026-10-30-vs-rule-tweaks.md) |
 | 2026-10-30 | [Wiki set up](2026-10-30-knowledge-base-setup.md) |

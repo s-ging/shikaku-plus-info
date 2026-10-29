@@ -13,6 +13,8 @@ export function simulate({ rules = {}, you = {}, them = {}, rounds = 60, maxSeco
 		const pace = [you.secs ?? 1.6, them.secs ?? 1.6];
 		const read = [you.read ?? 0, them.read ?? 0];
 		const lastBoard = [0, 0];
+		const lastTick = [0, 0];
+		const idle = (rules.idleTickSecs ?? FF_RULES.idleTickSecs) || Infinity;
 		const rng = new EconRng(seed * 31 + m);
 		const jitter = () => 0.6 + (rng.nextInt(1000) / 1000) * 0.8; // ×0.6–1.4
 		const next = [pace[0] * jitter(), pace[1] * jitter()];
@@ -21,7 +23,9 @@ export function simulate({ rules = {}, you = {}, them = {}, rounds = 60, maxSeco
 		while (!match.roundOver && t < maxSeconds) {
 			const i = next[0] <= next[1] ? 0 : 1;
 			t = next[i];
-			match.act(i, bots[i].decide(match.sides[i]));
+			const r = match.act(i, bots[i].decide(match.sides[i]));
+			if (r.moved) lastTick[i] = t;
+			else if (t - lastTick[i] >= idle) { match.idleTick(i); lastTick[i] = t; }
 			next[i] = t + pace[i] * jitter();
 			if (match.sides[i].boardIndex !== lastBoard[i]) {
 				lastBoard[i] = match.sides[i].boardIndex;
@@ -59,9 +63,10 @@ function report(label, st) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-	const P = (k) => ({ secs: BOT_PRESETS[k].secs, read: BOT_PRESETS[k].read, bot: BOT_PRESETS[k] });
 	// A strong human stand-in: ~2s per move, ~2.5s to read a new board, few mistakes.
 	const human = { secs: 2.0, read: 2.5, bot: { misplay: 0.08, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.8 } };
+	// Mirror copies the human's pace (reads folded into the average, as the lab measures it).
+	const P = (k) => (BOT_PRESETS[k].mirror ? { secs: human.secs + human.read / 6, read: 0, bot: BOT_PRESETS[k] } : { secs: BOT_PRESETS[k].secs, read: BOT_PRESETS[k].read, bot: BOT_PRESETS[k] });
 	console.log('— Strong human stand-in (left) vs each preset (right) —');
 	for (const k of Object.keys(BOT_PRESETS)) report(`human vs ${BOT_PRESETS[k].label}`, simulate({ you: human, them: P(k), rounds: 80 }));
 	console.log('— Ladder: each preset vs the next one up —');

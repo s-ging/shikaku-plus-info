@@ -278,3 +278,26 @@ test('icebreaker: steps in early when ice leaves no legal move at all', () => {
 	assert.equal(ev[0].cell, 1, 'nearest to thaw');
 	assert.equal(e.hasIceFreeMove(board), true);
 });
+
+test('rule C: a bank of 4+ left sitting for 6 moves queues an ice', () => {
+	const e = p();
+	e.incoming = [{ count: 8, eta: 50 }];
+	for (let i = 0; i < 5; i++) e.tick(FREE);
+	assert.equal(e.iceIncoming.length, 0);
+	const ev = e.tick(FREE);
+	assert.ok(kinds(ev).includes('bankFreeze'));
+	assert.equal(e.iceIncoming.length, 1);
+	const off = p({ bankFreezeEvery: 0 });
+	off.incoming = [{ count: 8, eta: 50 }];
+	for (let i = 0; i < 12; i++) off.tick(FREE);
+	assert.equal(off.iceIncoming.length, 0);
+});
+
+test('idle tick: the clock moves without a move, so stalling stops working', () => {
+	const m = new FFMatch({ seed: 12 });
+	const e = m.sides[0].econ;
+	e.mines = [{ cell: m.sides[0].landable()[0], fuse: 1 }];
+	const r = m.idleTick(0);
+	assert.ok(r.events.some((x) => x.kind === 'mineExplode'));
+	assert.equal(e.hearts, 2);
+});

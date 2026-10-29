@@ -20,7 +20,8 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 ## The clock
 
 - There is no wall clock. Each player's board ticks once per move: a placement or an erase. Tapping an empty cell is not a move. Moves come roughly every 1.5 to 1.8 seconds in real play.
-- Incoming mines and ice land when you move (Tetris-style), so a player who stops to think is never hit while thinking.
+- Incoming mines and ice land when you move (Tetris-style), so a player who stops to think gets a short grace.
+- **Idle tick (2026-10-30):** if you make no move for 4 seconds, your board ticks anyway. Stalling to dodge a landing doesn't work. The client runs this timer; the match server will have to as well.
 - A move resolves in order: your box goes down (defusing what it covers, thawing ice beside it); if that finished the board, your attack goes out and cancels mines still flying at you; then your board ticks.
 
 ## Mines
@@ -44,7 +45,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 
 | Rule | Value |
 | --- | --- |
-| Sources | A perfect clear (no erase or overwrite on that board) sends 1 ice. Ice your opponent thaws by building comes back to you. |
+| Sources | **Rule C (2026-10-30, Krischan's original rule):** 4 or more mines sitting in your orange bank for 6 of your moves in a row queue 1 ice on your own board, and again every 6 moves after. It's the price of holding your last box for a bigger counter-spike, and the ice source every player meets, not only those who clear perfectly. Also: a perfect clear (no erase or overwrite on that board) sends 1 ice, and ice your opponent thaws by building comes back to you. |
 | On the way | Lands **2** of your moves after it's sent, on a random empty non-clue cell. No cap: ice stacks if the opponent is cracked. No landing cell is marked; the board catches a chill (blue frost, drifting snow) and the ice block on the hazard bar blinks. |
 | Effect | Refuses boxes. A board cannot be finished while ice is on it. |
 | Thaw points | 4, shown as a growing dark wedge |
@@ -58,7 +59,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 - 3 hearts per round.
 - **KO:** out of hearts, or 4 ice on your board at once (**freeze-over**). Ice still on its way doesn't count until it lands, and several can land on one move.
 - A KO ends the round and **fully resets both players**, winner included, so nobody snowballs. First to 7 rounds.
-- **Heal:** 4 perfect boards in a row (was 3) heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board.
+- **Heal:** 4 perfect boards in a row (was 3) heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board. On the hearts pole the healing heart beats while the current board can still be perfect, and flatlines and drains the moment you erase or overwrite a box.
 - **Rush:** after 100 moves (average of both players; was 150), every mine attack is worth 5 times as much. It guarantees every round ends.
 - Boards: 6×6 Classic, both players race the same seeded sequence at their own pace.
 
@@ -116,9 +117,14 @@ From `prototypes/vs-lab/test/ffsim.js` (bots at about 1.6 seconds per move that 
 | Normal | 2.4 | 3s | 15% | 5% / 7% | 55% |
 | Hard | 1.9 | 2.2s | 10% | 4% / 5% | 70% |
 | Expert | 1.4 | 1.5s | 6% | 3% / 4% | 85% |
-| Impossible | 1.1 | 1.1s | 5% | 2.5% / 3% | 92% |
+| Impossible | 1.0 | 0.9s | 3% | 1.5% / 2% | 97% |
+| Mirror | your pace | (in your pace) | 5% | 3% / 3% | 90% |
 
-Each preset beats the one below about 85% of the time. A strong player at about 2 seconds per move should win about 75% against Normal, split Hard, win about 22% against Expert, and steal the odd round from Impossible. The "reads a new board" pause matters: without it the bot never stops to read a fresh board the way people do.
+Expert holds its last box for 1 turn and Impossible for 2 when its orange bank has 4 or more and nothing is about to land: counter-spike timing. **Mirror** measures your last dozen moves and plays at exactly that speed, so only decisions separate you (Krischan's own lost bot worked this way: "if you're at 2pps, the bot is 2pps").
+
+Simulated against a strong human stand-in (2s a move, 2.5s to read a board), 2026-10-30 with rule C and the idle tick: Easy 15% bot wins, Normal 36%, Hard 39%, Expert 74%, **Impossible 89%**, Mirror 69%. Rounds against Impossible run under a minute; ice ends about a quarter of them now that rule C exists. Each preset beats the one below 65 to 78% of the time.
+
+Lab extras: **Copy round log** (on the round-over card and in the rules lab) copies the round as JSON: bot preset and stats, seed, result and KO type, every event with its time, side and move number, and only the rules you changed. The "reads a new board" pause matters: without it the bot never stops to read a fresh board the way people do.
 
 ## Play-testing notes from Krischan (2026-10-29)
 
@@ -132,7 +138,6 @@ Each preset beats the one below about 85% of the time. A strong player at about 
 - **Counter-spike strength:** full counter makes rounds short and snowbally in simulation; refund mode is the middle ground. Decide by feel.
 - **Ice threat:** ice almost never ends a round with batches of 6. Fine if mines are meant to be the killer; otherwise lower freeze-over or raise ice per perfect clear.
 
-- **Pool freezing:** Krischan's original rule had a backed-up mine pool slowly freeze cells. Not built; to discuss.
 - **Meso / timing:** counter-spikes are the first timing decision (when to clear). Holding an attack to fire later is the next candidate.
 - **Spicy mines:** row, column or diagonal blasts as rare attacks. Version 2 content.
 - **Spread landing** (one mine per unsolved region): built as a toggle; barely changes results in the simulations.
