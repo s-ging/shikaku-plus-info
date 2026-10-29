@@ -1,0 +1,227 @@
+// ffmatch.js — Fuse & Frost match. Each board ticks on its OWN player's moves,
+// so incoming mines land when you move (Tetris garbage) and you can always stop
+// and plan. Faster players simply attack more often.
+import { Rect } from './puzzle.js';
+import { commit, isSolved } from './game.js';
+import { rectCellsOf, edgeCellsOf, coveredSet, unplacedGivens } from './economy.js';
+import { vsBoard, ReplayBot } from './match.js';
+import { FF_RULES, FFPlayer } from './fusefrost.js';
+
+export class FFSide {
+	constructor(name, rules, seed) {
+		this.name = name;
+		this.econ = new FFPlayer(rules, seed);
+		this.boardIndex = 0;
+		this.cleared = 0;
+		this.puzzle = null;
+		this.rects = [];
+		this.regionOf = null;
+	}
+	get N() {
+		return this.puzzle.nums.length;
+	}
+	board() {
+		return { N: this.N, nums: this.puzzle.nums, rects: this.rects };
+	}
+	iceCells() {
+		return this.econ.iceSet();
+	}
+	/** Engine seam: refuse rects over ice. */
+	isRectBlocked(rc) {
+		const ice = this.iceCells();
+		return rectCellsOf(rc, this.N).some((c) => ice.has(c));
+	}
+	/** Cells hazards may use: uncovered and never a clue. */
+	landable() {
+		const cov = coveredSet(this.board());
+		const out = [];
+		for (let y = 0; y < this.N; y++)
+			for (let x = 0; x < this.N; x++) {
+				const i = y * this.N + x;
+				if (!cov.has(i) && !this.puzzle.nums[y][x]) out.push(i);
+			}
+		return out;
+	}
+	deal(puzzle) {
+		this.puzzle = puzzle;
+		this.rects = [];
+		this.regionOf = new Array(puzzle.nums.length ** 2);
+		puzzle.layout.forEach((r, idx) => {
+			for (const c of rectCellsOf(r, this.N)) this.regionOf[c] = idx;
+		});
+	}
+}
+
+export class FFMatch {
+	constructor({ rules = FF_RULES, seed = 1, target = 7 } = {}) {
+		this.rules = rules;
+		this.seed = seed;
+		this.target = target;
+		this.score = [0, 0];
+		this.round = 0;
+		this.over = false;
+		this.newRound();
+	}
+
+	newRound() {
+		this.round++;
+		this.roundSeed = this.seed * 1000 + this.round;
+		this.sides = [
+			new FFSide('you', this.rules, this.roundSeed * 3 + 1),
+			new FFSide('them', this.rules, this.roundSeed * 3 + 2)
+		];
+		for (const s of this.sides) s.deal(vsBoard(this.roundSeed, 0));
+		this.roundOver = null;
+		this.leadChanges = 0;
+		this._lead = 0;
+	}
+
+	/** Average moves made by both players this round. */
+	get moves() {
+		return (this.sides[0].econ.ticks + this.sides[1].econ.ticks) / 2;
+	}
+	get rush() {
+		return !!this.rules.rushAfter && this.moves >= this.rules.rushAfter;
+	}
+
+	_apply(side, action) {
+		if (!action) return { moved: false, events: [] };
+		const N = side.N;
+		const state = { nums: side.puzzle.nums, rects: side.rects, N };
+		if (action.type === 'erase') {
+			const res = commit(action.x, action.y, action.x, action.y, state);
+			return res.changed ? { moved: true, events: side.econ.onErase() } : { moved: false, events: [] };
+		}
+		if (side.isRectBlocked(new Rect(action.ax, action.ay, action.bx, action.by)))
+			return { moved: false, events: [], denied: 'ice' };
+		const before = side.rects.length;
+		const res = commit(action.ax, action.ay, action.bx, action.by, state);
+		if (!res.placed) return { moved: false, events: [], denied: 'invalid' };
+		const rc = res.placed;
+		const doOver = before - (side.rects.length - 1) > 0;
+		return { moved: true, placed: rc, events: side.econ.onPlacement(rectCellsOf(rc, N), edgeCellsOf(rc, N), { doOver }) };
+	}
+
+	/** One move for side i: resolve it, then that side's clock ticks. */
+	act(i, action) {
+		if (this.over || this.roundOver) return { moved: false, events: [] };
+		const s = this.sides[i];
+		const opp = this.sides[1 - i];
+		const out = [];
+		const tag = (side, evs) => evs.forEach((e) => out.push({ side: side.name, ...e }));
+
+		const a = this._apply(s, action);
+		if (!a.moved) return { moved: false, events: [], denied: a.denied };
+		tag(s, a.events);
+		this._icebreak(s, tag);
+
+		// Clear resolves before the tick, so its attack cancels incoming first.
+		if (isSolved(s.rects, s.N)) {
+			tag(s, s.econ.onBoardCleared());
+			s.cleared++;
+			s.boardIndex++;
+			s.deal(vsBoard(this.roundSeed, s.boardIndex));
+			s.econ.retargetIce(s.landable());
+			if (s.econ.spill) {
+				tag(s, s.econ.receiveIce(s.econ.spill, s.landable()));
+				s.econ.spill = 0;
+			}
+			out.push({ side: s.name, kind: 'newBoard', index: s.boardIndex });
+		}
+		this._route(s, opp, out);
+
+		const evs = s.econ.tick(s.landable(), this.rules.spreadLanding ? s.regionOf : null);
+		tag(s, evs);
+		for (const e of evs) if (e.kind === 'mineExplode') tag(s, this._explode(s, e.cell));
+		this._icebreak(s, tag);
+		this._route(s, opp, out);
+
+		this._trackLead();
+		this._checkKO(out);
+		return { moved: true, events: out, placed: a.placed };
+	}
+
+	_icebreak(s, tag) {
+		tag(s, s.econ.checkStuckAndForceBreak(s.board(), unplacedGivens(s.board()).length));
+	}
+
+	_route(s, opp, out) {
+		const { mines, ice } = s.econ.drainOut();
+		if (mines) {
+			const n = this.rush ? mines * this.rules.rushMultiplier : mines;
+			const cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
+			const pass = n - cancelled;
+			if (pass) opp.econ.receiveMines(pass).forEach((e) => out.push({ side: opp.name, ...e }));
+			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass, rush: this.rush });
+		}
+		if (ice) {
+			opp.econ.receiveIce(ice, opp.landable()).forEach((e) => out.push({ side: opp.name, ...e }));
+			out.push({ side: s.name, kind: 'sendIce', count: ice });
+		}
+	}
+
+	_explode(side, cell) {
+		const N = side.N;
+		const cx = cell % N;
+		const cy = Math.floor(cell / N);
+		const r = this.rules.blastRadius;
+		const hit = side.rects.filter((rc) => rc.x1 <= cx + r && rc.x2 >= cx - r && rc.y1 <= cy + r && rc.y2 >= cy - r);
+		side.rects = side.rects.filter((rc) => !hit.includes(rc));
+		return hit.length ? [{ kind: 'rectsBlown', cell, count: hit.length }] : [];
+	}
+
+	/** Danger 0..1: the larger of hearts lost and ice toward freeze-over. */
+	danger(i) {
+		const e = this.sides[i].econ;
+		const r = this.rules;
+		return Math.max((r.hearts - e.hearts) / r.hearts, e.ice.length / r.freezeOverAt);
+	}
+
+	/** Lead = who is in less danger; counts every time it flips. */
+	_trackLead() {
+		const d = this.danger(1) - this.danger(0);
+		const lead = Math.abs(d) < 0.2 ? 0 : Math.sign(d);
+		if (lead !== 0 && this._lead !== 0 && lead !== this._lead) this.leadChanges++;
+		if (lead !== 0) this._lead = lead;
+	}
+
+	_checkKO(out) {
+		if (this.roundOver) return;
+		const ko = this.sides.map((s) => s.econ.isKO);
+		if (!ko[0] && !ko[1]) return;
+		const winner = ko[0] && ko[1] ? null : ko[0] ? 1 : 0;
+		const loser = this.sides[winner === 0 ? 1 : 0].econ;
+		if (winner !== null) this.score[winner]++;
+		this.roundOver = { winner, by: loser.hearts <= 0 ? 'mines' : 'ice' };
+		if (this.score.some((x) => x >= this.target)) this.over = true;
+		out.push({ side: 'match', kind: 'roundOver', winner, by: this.roundOver.by, score: [...this.score] });
+	}
+}
+
+/** Replay bot that tilts: mistakes climb with live mines and lost hearts. */
+export class TiltBot extends ReplayBot {
+	constructor(opts = {}) {
+		super({ idle: 0, ...opts });
+		this.baseMisplay = opts.misplay ?? 0.12;
+		this.tiltPerMine = opts.tiltPerMine ?? 0.04;
+		this.tiltPerHeart = opts.tiltPerHeart ?? 0.06;
+	}
+	decide(side) {
+		const e = side.econ;
+		this.misplay = Math.min(0.9, this.baseMisplay + this.tiltPerMine * e.mines.length + this.tiltPerHeart * (e.rules.hearts - e.hearts));
+		return super.decide(side);
+	}
+}
+
+/**
+ * Bot presets. secs = average seconds per move (±40% jitter); read = extra
+ * seconds before its first move on a fresh board (humans read the board first).
+ * Every preset keeps a margin of error, Impossible included.
+ */
+export const BOT_PRESETS = {
+	easy: { label: 'Easy', secs: 3.2, read: 4, misplay: 0.24, tiltPerMine: 0.06, tiltPerHeart: 0.08, defuseFirst: 0.35 },
+	normal: { label: 'Normal', secs: 2.4, read: 3, misplay: 0.15, tiltPerMine: 0.05, tiltPerHeart: 0.07, defuseFirst: 0.55 },
+	hard: { label: 'Hard', secs: 1.9, read: 2.2, misplay: 0.1, tiltPerMine: 0.04, tiltPerHeart: 0.05, defuseFirst: 0.7 },
+	expert: { label: 'Expert', secs: 1.4, read: 1.5, misplay: 0.06, tiltPerMine: 0.03, tiltPerHeart: 0.04, defuseFirst: 0.85 },
+	impossible: { label: 'Impossible', secs: 1.1, read: 1.1, misplay: 0.05, tiltPerMine: 0.025, tiltPerHeart: 0.03, defuseFirst: 0.92 }
+};

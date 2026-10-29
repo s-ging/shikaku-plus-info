@@ -1,0 +1,2098 @@
+<title>Shikaku+ VS Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Antique+B1&family=Shippori+Mincho+B1:wght@600;800&display=swap">
+<style>
+/* Layout: one-screen game lab — your board is the stage, the opponent sits beside
+   it as a smaller mirror, the lab panel (log + rule sliders) runs underneath.
+   Tokens follow the Shikaku+ design system (tokens.css): dark is the brand default. */
+:root {
+	--bg: #1b1b1b;
+	--surface: #232220;
+	--chip: #2f2e2a;
+	--cell: #37311f;
+	--line: rgba(255, 255, 255, 0.09);
+	--fg: #ffffff;
+	--fg2: rgba(255, 255, 255, 0.7);
+	--fg3: rgba(255, 255, 255, 0.45);
+	--accent: #d0b878;
+	--accent-ink: #1b1b1b;
+	--num: #ffffff;
+	--num-on-block: rgba(0, 0, 0, 0.35);
+	--drag-fill: rgba(68, 136, 255, 0.33);
+	--drag-stroke: #4488ff;
+	--invalid-fill: rgba(255, 85, 85, 0.4);
+	--invalid-stroke: #ff5555;
+	--cold: #8098b0;
+	--hot: #d08080;
+	--cold-promise: #4e647a;
+	--hot-promise: #d0b878;
+	--ice: #b9d3e3;
+	--ice-ink: #2b4558;
+	--mine-3: #b04040;
+	--mine-2: #d06060;
+	--mine-1: #ff4040;
+	--good: #88b098;
+	--fader: #ffffff;
+	--overlay: rgba(26, 26, 46, 0.87);
+	--radius: 4px;
+	--font-ui: 'Shippori Antique B1', 'Hiragino Sans', system-ui, sans-serif;
+	--font-brand: 'Shippori Mincho B1', 'Hiragino Mincho ProN', Georgia, serif;
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) {
+		--bg: #f2ede4; --surface: #eae4da; --chip: #ddd8ce; --cell: #e0d8c8;
+		--line: rgba(26, 22, 5, 0.1); --fg: #1a1605; --fg2: rgba(26, 22, 5, 0.7); --fg3: rgba(26, 22, 5, 0.48);
+		--accent: #b89050; --accent-ink: #ffffff; --num: #1a1605; --num-on-block: rgba(255, 255, 255, 0.71);
+		--drag-fill: rgba(51, 102, 204, 0.2); --drag-stroke: #3366cc; --invalid-fill: rgba(255, 68, 68, 0.27); --invalid-stroke: #cc3333;
+		--cold: #5f7d9c; --hot: #c06a6a; --cold-promise: #8fa3b8; --hot-promise: #d6bf86;
+		--ice: #cfe2ee; --ice-ink: #2b4558; --good: #5f8f74; --fader: #1a1605; --overlay: rgba(240, 235, 224, 0.93);
+		color-scheme: light;
+	}
+}
+:root[data-theme='light'] {
+	--bg: #f2ede4; --surface: #eae4da; --chip: #ddd8ce; --cell: #e0d8c8;
+	--line: rgba(26, 22, 5, 0.1); --fg: #1a1605; --fg2: rgba(26, 22, 5, 0.7); --fg3: rgba(26, 22, 5, 0.48);
+	--accent: #b89050; --accent-ink: #ffffff; --num: #1a1605; --num-on-block: rgba(255, 255, 255, 0.71);
+	--drag-fill: rgba(51, 102, 204, 0.2); --drag-stroke: #3366cc; --invalid-fill: rgba(255, 68, 68, 0.27); --invalid-stroke: #cc3333;
+	--cold: #5f7d9c; --hot: #c06a6a; --cold-promise: #8fa3b8; --hot-promise: #d6bf86;
+	--ice: #cfe2ee; --ice-ink: #2b4558; --good: #5f8f74; --fader: #1a1605; --overlay: rgba(240, 235, 224, 0.93);
+	color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font-ui);
+	font-size: 14px;
+	line-height: 1.45;
+	padding-left: max(16px, env(safe-area-inset-left, 0px));
+	padding-right: max(16px, env(safe-area-inset-right, 0px));
+	padding-block: 12px 32px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--drag-stroke); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* —— Top bar —— */
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-brand); font-weight: 800; font-size: 22px; letter-spacing: 0.01em; margin: 0; }
+.brand span { color: var(--accent); }
+.score { display: flex; align-items: baseline; gap: 8px; margin-left: auto; }
+.score b { font-family: var(--font-brand); font-size: 22px; font-weight: 800; }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg3); }
+.seg { display: inline-flex; background: var(--chip); border-radius: var(--radius); padding: 2px; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: var(--radius); color: var(--fg2); }
+.seg button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+.btn { border: 0; border-radius: var(--radius); background: var(--chip); padding: 6px 12px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+
+/* —— Arena —— */
+.arena { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.player { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.phead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pname { font-family: var(--font-brand); font-weight: 800; font-size: 17px; }
+.temp-read { margin-left: auto; font-family: var(--font-brand); font-weight: 800; font-size: 26px; line-height: 1; }
+.temp-read.cold { color: var(--cold); }
+.temp-read.hot { color: var(--hot); }
+.raw { font-size: 12px; color: var(--fg3); }
+
+.tbar { position: relative; height: 16px; background: var(--chip); border-radius: var(--radius); overflow: hidden; }
+.tbar .fill, .tbar .promise { position: absolute; top: 0; bottom: 0; }
+.tbar .promise { z-index: 1; border-left: 1px solid var(--fg3); border-right: 1px solid var(--fg3); }
+.tbar .zero { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--fg3); }
+.tbar .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.tbar .fader { position: absolute; top: -1px; bottom: -1px; width: 3px; margin-left: -1px; background: var(--fader); border-radius: 1px; }
+.tscale { display: flex; justify-content: space-between; font-size: 10px; color: var(--fg3); margin-top: -4px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: var(--radius); padding: 3px 8px; font-size: 12px; color: var(--fg2); display: inline-flex; gap: 5px; align-items: center; }
+.chip b { color: var(--fg); font-weight: 400; }
+.chip.warn { background: color-mix(in srgb, var(--mine-3) 32%, var(--chip)); color: var(--fg); }
+.chip.frost { background: color-mix(in srgb, var(--ice) 26%, var(--chip)); color: var(--fg); }
+.chip.dim { opacity: 0.55; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.stage { position: relative; }
+canvas.board { display: block; width: 100%; height: auto; aspect-ratio: 1; max-width: 100%; touch-action: none; border-radius: var(--radius); }
+.player.them canvas.board { max-width: 300px; }
+.overlay { position: absolute; inset: 0; background: var(--overlay); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--radius); text-align: center; padding: 16px; }
+.overlay h2 { font-family: var(--font-brand); font-size: 30px; margin: 0; }
+.hint { font-size: 12px; color: var(--fg3); margin: 0; }
+
+/* —— Lab —— */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
+.panel { background: var(--surface); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.panel h3 { font-family: var(--font-brand); font-size: 15px; margin: 0 0 8px; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.log li { display: grid; grid-template-columns: 34px 40px minmax(0, 1fr); gap: 6px; color: var(--fg2); }
+.log li .t { color: var(--fg3); }
+.log li.you .who { color: var(--accent); }
+.log li.them .who { color: var(--cold); }
+.log li.match { color: var(--fg); }
+.find { border-left: 2px solid var(--accent); padding: 4px 0 4px 10px; color: var(--fg2); font-size: 12.5px; margin: 0 0 10px; max-width: 65ch; }
+.groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px 20px; }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); padding: 0; margin-bottom: 4px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 42px; gap: 8px; align-items: center; font-size: 12.5px; }
+.row label { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row output { text-align: right; font-variant-numeric: tabular-nums; }
+.row input[type='range'] { width: 100%; accent-color: var(--accent); }
+.row.toggle { grid-template-columns: minmax(0, 1fr) auto; }
+.row select { background: var(--chip); border: 0; border-radius: var(--radius); padding: 3px 6px; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tools .btn { font-size: 12.5px; padding: 5px 10px; }
+details.lab-rules > summary { cursor: pointer; font-family: var(--font-brand); font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.lab-rules > summary::-webkit-details-marker { display: none; }
+details.lab-rules > summary::before { content: '+'; color: var(--accent); width: 12px; }
+details.lab-rules[open] > summary::before { content: '−'; }
+details.lab-rules[open] > summary { margin-bottom: 10px; }
+
+@media (max-width: 760px) {
+	.arena { grid-template-columns: minmax(0, 1fr); }
+	.player.them { order: -1; }
+	.player.them canvas.board { max-width: 170px; }
+	.lab { grid-template-columns: minmax(0, 1fr); }
+	.score { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+	<header class="top">
+		<h1 class="brand">Shikaku<span>+</span> VS Lab</h1>
+		<div class="seg" role="group" aria-label="Clock">
+			<button id="clock-move" aria-pressed="true">Per move</button>
+			<button id="clock-real" aria-pressed="false">Real time</button>
+		</div>
+		<button class="btn" id="pause" hidden>Pause</button>
+		<div class="score">
+			<span class="label" id="round-label">Round 1 · first to 7</span>
+			<b class="num" id="score">0 – 0</b>
+		</div>
+		<button class="btn" id="restart">New match</button>
+	</header>
+
+	<main class="arena">
+		<section class="player you" aria-label="Your board">
+			<div class="phead">
+				<span class="pname">You</span>
+				<span class="raw num" id="you-raw"></span>
+				<span class="temp-read num" id="you-temp">0°</span>
+			</div>
+			<div class="tbar" id="you-bar"></div>
+			<div class="tscale num"><span>−100</span><span>−50</span><span>0</span><span>+50</span><span>+100</span></div>
+			<div class="chips" id="you-chips"></div>
+			<div class="stage">
+				<canvas class="board" id="you-board" aria-label="Your Shikaku board"></canvas>
+				<div class="overlay" id="overlay" hidden>
+					<h2 id="ov-title">Round won</h2>
+					<p class="hint" id="ov-sub"></p>
+					<button class="btn primary" id="ov-next">Next round</button>
+				</div>
+			</div>
+			<p class="hint">Drag to place a rectangle. Tap a rectangle to erase it. Cover a mine with a finished rectangle to defuse it. Frozen cells refuse rectangles; build next to them to thaw.</p>
+		</section>
+
+		<section class="player them" aria-label="Opponent board">
+			<div class="phead">
+				<span class="pname">Bot</span>
+				<span class="raw num" id="them-raw"></span>
+				<span class="temp-read num" id="them-temp">0°</span>
+			</div>
+			<div class="tbar" id="them-bar"></div>
+			<div class="chips" id="them-chips"></div>
+			<canvas class="board" id="them-board" aria-label="Opponent board"></canvas>
+		</section>
+	</main>
+
+	<section class="lab">
+		<div class="panel">
+			<h3>Match log</h3>
+			<ul class="log" id="log"></ul>
+		</div>
+		<div class="panel">
+			<details class="lab-rules" id="rules-details" open>
+				<summary>Rules lab</summary>
+				<p class="find">Bot-vs-bot finding: with net-cancel on, two equally good players never lose. Their clears cancel each other's mines and each clear adds +15°. Switch Overflow to passthrough, or turn on margin time, to break the stalemate.</p>
+				<div class="groups" id="groups"></div>
+				<div class="tools">
+					<button class="btn" id="t-mines-me">Send me 4 mines</button>
+					<button class="btn" id="t-mines-bot">Send bot 4 mines</button>
+					<button class="btn" id="t-cold">Set me to −40°</button>
+					<button class="btn" id="t-reset">Reset rules</button>
+					<button class="btn" id="t-copy">Copy rules JSON</button>
+				</div>
+			</details>
+		</div>
+	</section>
+</div>
+
+<script>
+// ===== puzzle.js =====
+// @ts-nocheck — VERBATIM parity-critical port; kept byte-faithful to the Dart
+// source (spec §5). Type-checking is disabled here on purpose so the RNG-call
+// order is never "tidied" to satisfy the checker. Guarded by the golden-vector
+// test in puzzle.test.js instead.
+// puzzle.js — deterministic Shikaku generator. Port of puzzle_codec.dart.
+// VERBATIM port (see spec §5). Do not "clean up" — the exact order of RNG calls
+// determines the output. Verified byte-for-byte against the Dart generator.
+
+// —— Park–Miller LCG (a=48271, m=2³¹−1) via Schrage's method ——
+class Rng {
+	static m = 2147483647; // 2³¹ − 1 (Mersenne prime)
+	static a = 48271;
+	static q = 44488; // floor(m / a)
+	static r = 3399; // m mod a
+
+	constructor(seed) {
+		this._s = Rng._init(seed);
+	}
+
+	static _init(v) {
+		// Map any integer into [1, m−1]. (v % m) can be negative in JS, so normalize.
+		const s = ((v % Rng.m) + Rng.m) % Rng.m;
+		return s <= 0 ? 1 : s;
+	}
+
+	_advance() {
+		const hi = Math.floor(this._s / Rng.q);
+		const lo = this._s % Rng.q;
+		this._s = Rng.a * lo - Rng.r * hi;
+		if (this._s < 0) this._s += Rng.m;
+		return this._s;
+	}
+
+	nextInt(bound) {
+		if (bound <= 1) return 0;
+		return this._advance() % bound;
+	}
+	nextDouble() {
+		return (this._advance() - 1) / (Rng.m - 1);
+	}
+}
+
+// —— Stable string→seed hash (djb2). Matches Dart's _stableHash on VM + web. ——
+// Only needed if you ever seed from an arbitrary string. The daily puzzle seeds
+// from an integer (see §6), so this is optional for the landing page.
+function stableHash(s) {
+	let h = 5381;
+	for (let i = 0; i < s.length; i++) {
+		h = (h * 33 + s.charCodeAt(i)) & 0x7fffffff; // keep low 31 bits, positive
+	}
+	return h === 0 ? 1 : h;
+}
+
+// —— Rectangle (normalizes corners so x1<=x2, y1<=y2) ——
+class Rect {
+	constructor(ax, ay, bx, by) {
+		this.x1 = Math.min(ax, bx);
+		this.y1 = Math.min(ay, by);
+		this.x2 = Math.max(ax, bx);
+		this.y2 = Math.max(ay, by);
+		this.valid = null; // null=unverified, true=valid, false=invalid
+	}
+	get w() {
+		return this.x2 - this.x1 + 1;
+	}
+	get h() {
+		return this.y2 - this.y1 + 1;
+	}
+	get area() {
+		return this.w * this.h;
+	}
+	has(x, y) {
+		return x >= this.x1 && x <= this.x2 && y >= this.y1 && y <= this.y2;
+	}
+	overlaps(o) {
+		return this.x1 <= o.x2 && this.x2 >= o.x1 && this.y1 <= o.y2 && this.y2 >= o.y1;
+	}
+}
+
+// —— Difficulty: maxAreaFrac ceilings (Classic uses only maxAreaFrac) ——
+const DIFFICULTY = { easy: 0.25, medium: 0.15, hard: 0.09, brutal: 0.05 };
+
+// —— Core layout generator. Returns { nums, layout }. ——
+// nums: N×N clue grid (0 = empty). layout: the solution rectangles.
+function makeLayout(sz, maxAreaFrac, rng) {
+	const total = sz * sz;
+	const sizeBoost = Math.max(0, Math.min(0.2, ((sz - 10) / 6.0) * 0.2));
+	const maxArea = Math.max(2, Math.trunc(total * maxAreaFrac * (1.0 + sizeBoost)));
+
+	for (let attempt = 0; attempt < 100; attempt++) {
+		const occ = Array.from({ length: sz }, () => new Array(sz).fill(false));
+		let layout = [];
+		let filled = 0;
+
+		while (filled < total) {
+			// Pick the (skip+1)-th unoccupied cell in row-major order as the anchor.
+			let skip = rng.nextInt(total - filled);
+			let ax = 0,
+				ay = 0;
+			outer: for (let y = 0; y < sz; y++) {
+				for (let x = 0; x < sz; x++) {
+					if (occ[y][x]) continue;
+					if (skip-- > 0) continue;
+					ax = x;
+					ay = y;
+					break outer;
+				}
+			}
+
+			// Horizontal extent: count free cells left/right, pick the far corner.
+			let sl = 0,
+				sr = 0;
+			for (let x = ax - 1; x >= 0 && !occ[ay][x]; x--) sl++;
+			for (let x = ax + 1; x < sz && !occ[ay][x]; x++) sr++;
+			const bx = ax - sl + rng.nextInt(sl + sr + 1);
+			const xMin = Math.min(ax, bx),
+				xMax = Math.max(ax, bx);
+
+			// Vertical extent over the chosen column span, capped by maxArea.
+			let sa = 0,
+				sb = 0;
+			for (let y = ay - 1; y >= 0; y--) {
+				let clear = true;
+				for (let x = xMin; x <= xMax && clear; x++) clear = !occ[y][x];
+				if (!clear) break;
+				sa++;
+			}
+			for (let y = ay + 1; y < sz; y++) {
+				let clear = true;
+				for (let x = xMin; x <= xMax && clear; x++) clear = !occ[y][x];
+				if (!clear) break;
+				sb++;
+			}
+			const maxH = Math.max(1, Math.trunc(maxArea / (xMax - xMin + 1)));
+			sa = Math.min(sa, maxH);
+			sb = Math.min(sb, maxH);
+
+			const by = ay - sa + rng.nextInt(sa + sb + 1);
+			const rect = new Rect(ax, ay, bx, by);
+
+			for (let y = rect.y1; y <= rect.y2; y++)
+				for (let x = rect.x1; x <= rect.x2; x++) occ[y][x] = true;
+			filled += rect.area;
+			layout.push(rect);
+		}
+
+		// Eliminate 1×1 rects by absorbing each into an adjacent same-line rect.
+		let ok = true;
+		let i = 0;
+		while (i < layout.length) {
+			const r = layout[i];
+			if (r.w === 1 && r.h === 1) {
+				let merged = false;
+				for (let j = 0; j < layout.length && !merged; j++) {
+					if (j === i) continue;
+					const o = layout[j];
+					if (o.h === 1 && o.y1 === r.y1) {
+						// same row, height 1
+						if (o.x1 === r.x1 + 1) {
+							layout[j] = new Rect(r.x1, r.y1, o.x2, o.y2);
+							merged = true;
+						} else if (o.x2 === r.x1 - 1) {
+							layout[j] = new Rect(o.x1, o.y1, r.x1, o.y2);
+							merged = true;
+						}
+					}
+					if (!merged && o.w === 1 && o.x1 === r.x1) {
+						// same column, width 1
+						if (o.y1 === r.y1 + 1) {
+							layout[j] = new Rect(o.x1, r.y1, o.x2, o.y2);
+							merged = true;
+						} else if (o.y2 === r.y1 - 1) {
+							layout[j] = new Rect(o.x1, o.y1, o.x2, r.y1);
+							merged = true;
+						}
+					}
+				}
+				if (!merged) ok = false;
+				layout.splice(i, 1); // remove the 1×1 regardless; if unmerged we restart
+			} else {
+				i++;
+			}
+		}
+		if (!ok) continue; // unmergeable 1×1 — throw away this attempt, try again
+
+		// Place one clue per rect at a random cell inside it.
+		// IMPORTANT: nextInt(h) is consumed BEFORE nextInt(w) — preserve this order.
+		const nums = Array.from({ length: sz }, () => new Array(sz).fill(0));
+		for (const r of layout) {
+			const ry = r.y1 + rng.nextInt(r.h);
+			const rx = r.x1 + rng.nextInt(r.w);
+			nums[ry][rx] = r.area;
+		}
+		return { nums, layout };
+	}
+
+	// Fallback (after 100 failed attempts): each row is one rect of area sz.
+	const layout = [];
+	const nums = Array.from({ length: sz }, () => new Array(sz).fill(0));
+	for (let y = 0; y < sz; y++) {
+		layout.push(new Rect(0, y, sz - 1, y));
+		nums[y][Math.trunc(sz / 2)] = sz;
+	}
+	return { nums, layout };
+}
+
+// —— Public API: generate the clue grid for a Classic puzzle. ——
+function generateGrid(sz, maxAreaFrac, seed) {
+	return makeLayout(sz, maxAreaFrac, new Rng(seed)).nums;
+}
+
+// Also expose the full layout (clues + solution rects) for callers that need it.
+function generatePuzzle(sz, maxAreaFrac, seed) {
+	return makeLayout(sz, maxAreaFrac, new Rng(seed));
+}
+
+// ===== game.js =====
+// game.js — game rules + interaction logic (spec §4 / §9 / §2.1).
+
+
+// —— Block palette (theme-independent — never changes). spec §2.1 ——
+const RECT_PALETTE = [
+	'#D08080', // 0 rose
+	'#80B8B0', // 1 teal
+	'#A090C0', // 2 lavender
+	'#8098B0', // 3 slate blue
+	'#88B098', // 4 sage
+	'#D0B878', // 5 amber
+	'#B888A8', // 6 mauve
+	'#C5956B' // 7 sienna
+];
+
+// Deterministic color from a rect's coordinates (stable across save/reload).
+/** @param {{ x1: number, y1: number, x2: number, y2: number }} r */
+function rectColor(r) {
+	const i = (r.x1 * 31 + r.y1 * 17 + r.x2 * 7 + r.y2) % RECT_PALETTE.length;
+	return RECT_PALETTE[i];
+}
+
+// —— Validity of a single placed rectangle (spec §4) ——
+// nums: N×N grid of clue numbers (0 = empty). r: the rectangle being checked.
+// Valid iff it contains exactly one clue AND that clue == area.
+/** @param {Rect} r @param {number[][]} nums */
+function verifyRect(r, nums) {
+	let found = 0;
+	for (let y = r.y1; y <= r.y2; y++) {
+		for (let x = r.x1; x <= r.x2; x++) {
+			const n = nums[y][x];
+			if (n !== 0) {
+				if (found !== 0 || r.area !== n) return false; // 2nd clue, or area mismatch
+				found = n;
+			}
+		}
+	}
+	return found !== 0; // must contain at least one clue
+}
+
+// —— Solved check (Classic). spec §4 ——
+/** @param {Rect[]} rects @param {number} N */
+function isSolved(rects, N) {
+	if (rects.some((r) => r.valid !== true)) return false;
+	const cov = Array.from({ length: N }, () => new Array(N).fill(false));
+	for (const r of rects)
+		for (let y = r.y1; y <= r.y2; y++) for (let x = r.x1; x <= r.x2; x++) cov[y][x] = true;
+	return cov.every((row) => row.every(Boolean));
+}
+
+// —— Clue number color logic (spec §8.3) ——
+// Returns true if the cell sits under a valid placed block (use --num-on-block).
+/** @param {number} x @param {number} y @param {Rect[]} rects */
+function cellUnderBlock(x, y, rects) {
+	return rects.some((r) => r.valid === true && r.has(x, y));
+}
+
+// —— Commit a drag/tap (spec §9.1) ——
+// Mutates `rects` in place. Returns a result describing what happened.
+/**
+ * @param {number} ax @param {number} ay @param {number} bx @param {number} by
+ * @param {{ nums: number[][], rects: Rect[], N: number }} state
+ */
+function commit(ax, ay, bx, by, state) {
+	const { nums, rects, N } = state;
+	if (ax === bx && ay === by) {
+		// tap → erase
+		const i = rects.findIndex((r) => r.has(ax, ay));
+		if (i >= 0) rects.splice(i, 1);
+		return { changed: i >= 0, placed: null };
+	}
+	const nr = new Rect(ax, ay, bx, by);
+	if (!verifyRect(nr, nums)) return { changed: false, placed: null, denied: true };
+	for (let i = rects.length - 1; i >= 0; i--) if (rects[i].overlaps(nr)) rects.splice(i, 1);
+	nr.valid = true;
+	rects.push(nr);
+	return { changed: true, placed: nr, solved: isSolved(rects, N) };
+}
+
+// ===== economy.js =====
+// economy.js — Shikaku+ VS economy. The "brain".
+//
+// Import-free on purpose: this same file is meant to run in the prototype, in a
+// Cloudflare Durable Object (authoritative server), and be translated
+// line-for-line into vs_economy.dart for the Flutter client.
+//
+// Every mutation returns a list of events: { kind, ...data }. The UI and the
+// network layer react to events; nothing here touches rendering or the board.
+//
+// Cells are integer indices: i = y * N + x.
+// Spec: vs_handoff.md (Project doc). Section refs below point there.
+
+const DEFAULT_RULES = {
+	boardN: 6,
+
+	// §4 Temperature
+	tempMin: -100,
+	tempMax: 100,
+	tempStart: 0,
+	freezeThreshold: -25,
+	deepColdThreshold: -50,
+	mineLandTemp: -7.5,
+	mineDefuseTemp: 5,
+	mineExplodeTemp: -10,
+	passiveThawReward: 15,
+	activeThawReward: 25,
+	forceBreakReward: 30,
+	clearReward: 15,
+	decayAmount: 1,
+	decayEvery: 2,
+
+	// §5 Mines
+	mineFuse: 3,
+	activeMineCap: 4,
+	mineStagger: 2,
+	mineEta: 3,
+	mineBatch: 4,
+	blastRadius: 1, // 3×3
+
+	// §5.1 Surge (two open questions are toggles)
+	surgeAbsorptionCap: 3,
+	surgeUsesStagger: false, // false: surge discharge ignores the 2/turn stagger
+	zeroBankOnClear: true, // true: surge bank is wiped when you clear a board
+
+	// §6 Frozen cells
+	warnSteps: 3,
+	freezeStagger: 2,
+	thawPoints: 4,
+	passiveThawAmount: 1,
+	passiveThawEvery: 2,
+	activeThaw: 2,
+	comboThaw: 2,
+	perPlacementThawCap: 2,
+	maxWarnings: 1,
+	maxWarningsDeep: 2,
+
+	// §8 Attack
+	clearSendBase: 4,
+	perfectBonusCap: 4, // 4 + 4 = 8 max per clear
+	defusesPerSend: 2,
+	forceBreakSend: 2,
+	comboMilestone: 6,
+	comboSend: 1,
+	comboDecayPause: 2,
+	overflow: 'netCancel', // 'netCancel' | 'passthrough'
+	// Margin time (not in spec; anti-stalemate experiment, off by default).
+	// After marginStart ticks, sends are multiplied by 1 + marginStep per marginEvery ticks.
+	marginStart: 0,
+	marginEvery: 10,
+	marginStep: 0.25,
+
+	// §7 Solver
+	solverBudget: 20000
+};
+
+// —— Tiny deterministic RNG (Park–Miller, same constants as puzzle.js). ——
+// Redeclared here so this module stays import-free.
+class EconRng {
+	constructor(seed) {
+		const m = 2147483647;
+		const s = ((seed % m) + m) % m;
+		this.s = s <= 0 ? 1 : s;
+	}
+	nextInt(bound) {
+		if (bound <= 1) return 0;
+		const hi = Math.floor(this.s / 44488);
+		const lo = this.s % 44488;
+		this.s = 48271 * lo - 3399 * hi;
+		if (this.s < 0) this.s += 2147483647;
+		return this.s % bound;
+	}
+}
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+class PlayerEconomy {
+	constructor(rules = DEFAULT_RULES, seed = 1) {
+		this.rules = rules;
+		this.seed = seed;
+		this.reset();
+	}
+
+	reset() {
+		const r = this.rules;
+		this.rng = new EconRng(this.seed);
+		this.temp = r.tempStart;
+		this.turn = 0;
+
+		// Frozen cells: { cell, thaw, seq, landedTurn }
+		this.frozen = [];
+		this.freezeQueue = []; // warning countdowns, e.g. [3, 1]
+		this.turnsSinceFreezeSpawn = r.freezeStagger; // first warning can queue at once
+		this._frozenSeq = 0;
+
+		// Mines: pending (unbatched) → queue (batches w/ eta) → board → explode/defuse
+		this.pendingMines = 0;
+		this.mineQueue = []; // [{ count, eta }]
+		this.mines = []; // [{ cell, fuse }]
+		this.bank = 0; // surge overflow
+		this._staggerLeft = r.mineStagger;
+
+		this.defuses = 0;
+		this.combo = 0;
+		this.perfectStreak = 0;
+		this.doOversThisBoard = 0;
+		this.pendingMinesToSend = 0;
+		this.pendingBonusMines = 0;
+
+		this._decayAcc = 0;
+		this.decayPause = 0;
+		this._thawAcc = 0;
+	}
+
+	// —— Getters (§4) ——
+	get floor() {
+		return this.frozen.length ? this.rules.freezeThreshold * this.frozen.length : null;
+	}
+	get effectiveTemp() {
+		return this.frozen.length ? Math.min(this.temp, this.floor) : this.temp;
+	}
+	/** Freeze spawning reads RAW temp (prevents the spiral). */
+	get isFreezing() {
+		return this.temp <= this.rules.freezeThreshold;
+	}
+	get isDefeated() {
+		return this.effectiveTemp <= this.rules.tempMin;
+	}
+	/** Promise bar: only when raw sits above the floor. */
+	get showPromise() {
+		return this.frozen.length > 0 && this.temp > this.floor;
+	}
+	/** Everything still coming at you (for the queue UI and net-cancel). */
+	get incomingTotal() {
+		return this.pendingMines + this.mineQueue.reduce((a, b) => a + b.count, 0);
+	}
+
+	_occupied() {
+		const s = new Set();
+		for (const m of this.mines) s.add(m.cell);
+		for (const f of this.frozen) s.add(f.cell);
+		return s;
+	}
+	_addTemp(d) {
+		this.temp = clamp(this.temp + d, this.rules.tempMin, this.rules.tempMax);
+	}
+	_pickFree(freeCells) {
+		const occ = this._occupied();
+		const pool = freeCells.filter((c) => !occ.has(c));
+		if (!pool.length) return -1;
+		return pool[this.rng.nextInt(pool.length)];
+	}
+
+	// —— Incoming / outgoing (§8) ——
+	receiveMines(count) {
+		if (count > 0) this.pendingMines += count;
+		return [];
+	}
+
+	/** Net-cancel: remove from pending first, then batches from the back. Never landed mines. */
+	cancelIncoming(count) {
+		let left = count;
+		const fromPending = Math.min(left, this.pendingMines);
+		this.pendingMines -= fromPending;
+		left -= fromPending;
+		for (let i = this.mineQueue.length - 1; i >= 0 && left > 0; i--) {
+			const take = Math.min(left, this.mineQueue[i].count);
+			this.mineQueue[i].count -= take;
+			left -= take;
+			if (this.mineQueue[i].count === 0) this.mineQueue.splice(i, 1);
+		}
+		return count - left;
+	}
+
+	drainOutgoing() {
+		const n = this.pendingMinesToSend + this.pendingBonusMines;
+		this.pendingMinesToSend = 0;
+		this.pendingBonusMines = 0;
+		return n;
+	}
+
+	// —— Player actions ——
+
+	/**
+	 * A rect was committed.
+	 * @param {number[]} rectCells cells covered by the new rect
+	 * @param {number[]} edgeCells cells sharing an edge with the rect (outside it)
+	 * @param {{ doOver?: boolean }} opts doOver = the placement overwrote other rects
+	 */
+	onPlacement(rectCells, edgeCells, { doOver = false } = {}) {
+		const r = this.rules;
+		const ev = [];
+		const spent = new Map(); // per-cell thaw spent this placement (cap §6)
+
+		// Combo / do-over (§8)
+		if (doOver) {
+			this.doOversThisBoard++;
+			if (this.combo) ev.push({ kind: 'comboReset', combo: this.combo });
+			this.combo = 0;
+		} else {
+			this.combo++;
+			ev.push({ kind: 'combo', combo: this.combo });
+		}
+
+		// Defuse (§5): a committed rect covers the mine
+		const covered = new Set(rectCells);
+		for (let i = this.mines.length - 1; i >= 0; i--) {
+			const m = this.mines[i];
+			if (!covered.has(m.cell)) continue;
+			this.mines.splice(i, 1);
+			this._addTemp(r.mineDefuseTemp);
+			this.defuses++;
+			const sends = this.defuses % r.defusesPerSend === 0;
+			if (sends) this.pendingBonusMines += 1;
+			ev.push({ kind: 'defuse', cell: m.cell, sends });
+		}
+
+		// Active thaw (§6): frozen cells sharing an edge with the rect
+		const edge = new Set(edgeCells);
+		for (const f of [...this.frozen]) {
+			if (edge.has(f.cell)) this._thaw(f, r.activeThaw, 'active', spent, ev);
+		}
+
+		// Combo milestone (§8)
+		if (!doOver && this.combo > 0 && this.combo % r.comboMilestone === 0) {
+			this.pendingBonusMines += r.comboSend;
+			this.decayPause = r.comboDecayPause;
+			ev.push({ kind: 'comboAttack', combo: this.combo });
+			const target = this._nearestToThaw(this.frozen);
+			if (target) this._thaw(target, r.comboThaw, 'combo', spent, ev);
+		}
+		return ev;
+	}
+
+	/** A rect was erased by the player (tap). Erases tick; combo resets. */
+	onErase() {
+		const ev = [];
+		this.doOversThisBoard++;
+		if (this.combo) ev.push({ kind: 'comboReset', combo: this.combo });
+		this.combo = 0;
+		return ev;
+	}
+
+	_thaw(f, amount, source, spent, ev) {
+		const r = this.rules;
+		const used = spent.get(f.cell) ?? 0;
+		const amt = Math.min(amount, r.perPlacementThawCap - used);
+		if (amt <= 0) return;
+		spent.set(f.cell, used + amt);
+		f.thaw -= amt;
+		if (f.thaw <= 0) {
+			this.frozen.splice(this.frozen.indexOf(f), 1);
+			this._addTemp(r.activeThawReward);
+			ev.push({ kind: 'thaw', cell: f.cell, source });
+		} else {
+			ev.push({ kind: source === 'combo' ? 'comboThaw' : 'thawPulse', cell: f.cell, thaw: f.thaw });
+		}
+	}
+
+	_nearestToThaw(cells) {
+		if (!cells.length) return null;
+		const min = Math.min(...cells.map((f) => f.thaw));
+		const atMin = cells.filter((f) => f.thaw === min);
+		const oldest = Math.min(...atMin.map((f) => f.seq));
+		const ties = atMin.filter((f) => f.seq === oldest);
+		return ties[this.rng.nextInt(ties.length)];
+	}
+
+	// —— The clock (§3: one tick per turn) ——
+
+	/** @param {number[]} freeCells uncovered cells on this player's board */
+	tick(freeCells) {
+		const r = this.rules;
+		const ev = [];
+		this.turn++;
+		this._staggerLeft = r.mineStagger;
+		const bankBefore = this.bank; // surge only discharges what was banked before this tick
+
+		// 1) Passive decay (paused after a combo milestone)
+		if (this.decayPause > 0) this.decayPause--;
+		else if (++this._decayAcc >= r.decayEvery) {
+			this._decayAcc = 0;
+			this._addTemp(-r.decayAmount);
+		}
+
+		// 2) Fuses. Mines landing later this tick are untouched.
+		for (const m of [...this.mines]) {
+			m.fuse--;
+			if (m.fuse === 1) ev.push({ kind: 'mineFuseFinal', cell: m.cell });
+			if (m.fuse <= 0) {
+				this.mines.splice(this.mines.indexOf(m), 1);
+				this._addTemp(r.mineExplodeTemp);
+				ev.push({ kind: 'mineExplode', cell: m.cell });
+			}
+		}
+
+		// 3) Incoming batches
+		if (this.mineQueue.length) {
+			const front = this.mineQueue[0];
+			front.eta--;
+			if (front.eta <= 0) {
+				this.mineQueue.shift();
+				this.bank += this._landMines(front.count, freeCells, true, ev);
+			}
+		}
+		if (!this.mineQueue.length && this.pendingMines > 0) {
+			const c = Math.min(r.mineBatch, this.pendingMines);
+			this.pendingMines -= c;
+			this.mineQueue.push({ count: c, eta: r.mineEta });
+			ev.push({ kind: 'mineEnqueued', count: c, eta: r.mineEta });
+		}
+
+		// 4) Surge discharge (§5.1). Only what was banked before this tick.
+		if (bankBefore > 0) {
+			const release = Math.min(bankBefore, r.surgeAbsorptionCap);
+			this.bank -= release;
+			const surgeEv = [];
+			const left = this._landMines(release, freeCells, r.surgeUsesStagger, surgeEv);
+			this.bank += left;
+			if (release - left > 0) ev.push({ kind: 'surge', count: release - left }, ...surgeEv);
+		}
+
+		// 5) Freeze (reads RAW temp)
+		if (!this.isFreezing) {
+			if (this.freezeQueue.length) ev.push({ kind: 'freezeAbandon', count: this.freezeQueue.length });
+			this.freezeQueue = [];
+			this.turnsSinceFreezeSpawn++;
+		} else {
+			let landed = false;
+			this.freezeQueue = this.freezeQueue.map((w) => w - 1);
+			for (let i = 0; i < this.freezeQueue.length; i++) {
+				if (this.freezeQueue[i] > 0) continue;
+				const cell = this._pickFree(freeCells);
+				if (cell < 0) {
+					this.freezeQueue[i] = 0; // no room: retry next tick
+					continue;
+				}
+				this.frozen.push({ cell, thaw: r.thawPoints, seq: this._frozenSeq++, landedTurn: this.turn });
+				this.freezeQueue.splice(i--, 1);
+				this.turnsSinceFreezeSpawn = 0; // stagger resets ONLY on landing
+				landed = true;
+				ev.push({ kind: 'frozen', cell });
+			}
+			if (!landed) this.turnsSinceFreezeSpawn++;
+			const maxW = this.temp <= r.deepColdThreshold ? r.maxWarningsDeep : r.maxWarnings;
+			if (this.turnsSinceFreezeSpawn >= r.freezeStagger && this.freezeQueue.length < maxW) {
+				this.freezeQueue.push(r.warnSteps);
+				ev.push({ kind: 'freezeWarn', steps: r.warnSteps });
+			}
+		}
+
+		// 6) Passive thaw (skips cells that landed this tick)
+		if (++this._thawAcc >= r.passiveThawEvery) {
+			this._thawAcc = 0;
+			for (const f of [...this.frozen]) {
+				if (f.landedTurn === this.turn) continue;
+				f.thaw -= r.passiveThawAmount;
+				if (f.thaw <= 0) {
+					this.frozen.splice(this.frozen.indexOf(f), 1);
+					this._addTemp(r.passiveThawReward);
+					ev.push({ kind: 'thaw', cell: f.cell, source: 'passive' });
+				} else ev.push({ kind: 'thawPulse', cell: f.cell, thaw: f.thaw });
+			}
+		}
+
+		if (this.isDefeated) ev.push({ kind: 'loss' });
+		return ev;
+	}
+
+	/** Land up to n mines; returns how many couldn't land (→ bank). */
+	_landMines(n, freeCells, useStagger, ev) {
+		const r = this.rules;
+		let landed = 0;
+		while (landed < n) {
+			if (this.mines.length >= r.activeMineCap) break;
+			if (useStagger && this._staggerLeft <= 0) break;
+			const cell = this._pickFree(freeCells);
+			if (cell < 0) break;
+			this.mines.push({ cell, fuse: r.mineFuse });
+			if (useStagger) this._staggerLeft--;
+			this._addTemp(r.mineLandTemp);
+			ev.push({ kind: 'mineLand', cell });
+			landed++;
+		}
+		return n - landed;
+	}
+
+	// —— Board clear (§8) ——
+	onBoardCleared() {
+		const r = this.rules;
+		const ev = [];
+		// Defensive no-op: a cleared board can't hold ice (clue areas sum to N²).
+		for (const f of [...this.frozen]) ev.push(...this.forceBreakAt(f.cell));
+		this._addTemp(r.clearReward);
+		const perfect = this.doOversThisBoard === 0;
+		this.perfectStreak = perfect ? this.perfectStreak + 1 : 0;
+		const send = r.clearSendBase + Math.min(this.perfectStreak, r.perfectBonusCap);
+		this.pendingMinesToSend += send;
+		this.mines = []; // mines vanish with the board
+		if (r.zeroBankOnClear) this.bank = 0;
+		this.doOversThisBoard = 0;
+		ev.push({ kind: 'clear', perfect, perfectStreak: this.perfectStreak, send });
+		return ev;
+	}
+
+	// —— Force break (§7) ——
+	forceBreakAt(cell) {
+		const f = this.frozen.find((x) => x.cell === cell);
+		if (!f) return [];
+		this.frozen.splice(this.frozen.indexOf(f), 1);
+		this._addTemp(this.rules.forceBreakReward);
+		this.pendingBonusMines += this.rules.forceBreakSend;
+		return [{ kind: 'forceBreak', cell }];
+	}
+
+	/**
+	 * Anti-softlock. Run after every turn.
+	 * board: { N, nums: number[][], rects: {x1,y1,x2,y2}[] }
+	 * Breaks ice one cell at a time (nearest-to-thaw) only while some remaining
+	 * clue has no ice-free way to finish, and only if the player's routing is sound.
+	 */
+	checkStuckAndForceBreak(board) {
+		const ev = [];
+		if (!this.frozen.length) return ev;
+		const unplaced = unplacedGivens(board);
+		if (unplaced.length > this.frozen.length) return ev; // the gate (§7)
+
+		let guard = this.frozen.length + 1;
+		let passB = null; // computed once: does any completion exist, ignoring ice?
+		while (this.frozen.length && guard-- > 0) {
+			const ice = new Set(this.frozen.map((f) => f.cell));
+			const a = BoardCompletionSolver.analyze(board, ice, this.rules.solverBudget);
+			if (passB === null) passB = a.solvable;
+			if (!passB) break; // bad routing: the player's fault, no rescue
+			if (!a.blocked.length) break; // Pass A: every clue still has an ice-free finish
+			const candidates = this.frozen.filter((f) => a.blockingIce.has(f.cell));
+			const target = this._nearestToThaw(candidates);
+			if (!target) break;
+			ev.push(...this.forceBreakAt(target.cell));
+		}
+		return ev;
+	}
+}
+
+// —— Board helpers (pure) ——
+
+function rectCellsOf(rc, N) {
+	const out = [];
+	for (let y = rc.y1; y <= rc.y2; y++) for (let x = rc.x1; x <= rc.x2; x++) out.push(y * N + x);
+	return out;
+}
+
+function edgeCellsOf(rc, N) {
+	const out = [];
+	for (let x = rc.x1; x <= rc.x2; x++) {
+		if (rc.y1 > 0) out.push((rc.y1 - 1) * N + x);
+		if (rc.y2 < N - 1) out.push((rc.y2 + 1) * N + x);
+	}
+	for (let y = rc.y1; y <= rc.y2; y++) {
+		if (rc.x1 > 0) out.push(y * N + rc.x1 - 1);
+		if (rc.x2 < N - 1) out.push(y * N + rc.x2 + 1);
+	}
+	return out;
+}
+
+function coveredSet(board) {
+	const s = new Set();
+	for (const rc of board.rects) for (const c of rectCellsOf(rc, board.N)) s.add(c);
+	return s;
+}
+
+function freeCellsOf(board) {
+	const cov = coveredSet(board);
+	const out = [];
+	for (let i = 0; i < board.N * board.N; i++) if (!cov.has(i)) out.push(i);
+	return out;
+}
+
+function unplacedGivens(board) {
+	const cov = coveredSet(board);
+	const out = [];
+	for (let y = 0; y < board.N; y++)
+		for (let x = 0; x < board.N; x++) {
+			const v = board.nums[y][x];
+			if (v && !cov.has(y * board.N + x)) out.push({ x, y, v, cell: y * board.N + x });
+		}
+	return out;
+}
+
+// —— BoardCompletionSolver (§7): partial-state DFS + MRV, node budget ——
+const BoardCompletionSolver = {
+	/** Candidate rects for one clue: right area, contains only that clue, on uncovered cells. */
+	candidates(board, g, covered) {
+		const { N, nums } = board;
+		const out = [];
+		for (let w = 1; w <= g.v; w++) {
+			if (g.v % w) continue;
+			const h = g.v / w;
+			if (w > N || h > N) continue;
+			for (let x1 = Math.max(0, g.x - w + 1); x1 <= Math.min(g.x, N - w); x1++)
+				for (let y1 = Math.max(0, g.y - h + 1); y1 <= Math.min(g.y, N - h); y1++) {
+					const rc = { x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 };
+					let ok = true;
+					for (let y = rc.y1; y <= rc.y2 && ok; y++)
+						for (let x = rc.x1; x <= rc.x2 && ok; x++) {
+							if (covered.has(y * N + x)) ok = false;
+							else if (nums[y][x] && !(x === g.x && y === g.y)) ok = false;
+						}
+					if (ok) out.push({ rc, cells: rectCellsOf(rc, N) });
+				}
+		}
+		return out;
+	},
+
+	/** Pass B: is there any completion with ice treated as normal cells? */
+	solve(board, budget = 20000) {
+		return this.analyze(board, new Set(), budget);
+	},
+
+	/**
+	 * Enumerates completions (ignoring ice = Pass B) and reports which clues are
+	 * blocked: every completion-consistent rect for them contains ice.
+	 */
+	analyze(board, ice, budget = 20000) {
+		const covered = coveredSet(board);
+		const givens = unplacedGivens(board);
+		const cands = givens.map((g) => this.candidates(board, g, covered));
+		const used = new Uint8Array(board.N * board.N);
+		const seen = givens.map(() => new Set()); // candidate indices appearing in completions
+		const chosen = new Array(givens.length).fill(-1);
+		let nodes = 0;
+		let completions = 0;
+		let exhausted = false;
+
+		const dfs = (placedCount) => {
+			if (nodes++ > budget) {
+				exhausted = true;
+				return;
+			}
+			if (placedCount === givens.length) {
+				completions++;
+				chosen.forEach((ci, gi) => seen[gi].add(ci));
+				return;
+			}
+			// MRV: the unplaced clue with the fewest fitting candidates
+			let best = -1;
+			let bestFits = null;
+			for (let gi = 0; gi < givens.length; gi++) {
+				if (chosen[gi] >= 0) continue;
+				const fits = [];
+				cands[gi].forEach((c, ci) => {
+					if (c.cells.every((cell) => !used[cell])) fits.push(ci);
+				});
+				if (!fits.length) return; // dead end
+				if (!bestFits || fits.length < bestFits.length) {
+					best = gi;
+					bestFits = fits;
+				}
+			}
+			for (const ci of bestFits) {
+				for (const cell of cands[best][ci].cells) used[cell] = 1;
+				chosen[best] = ci;
+				dfs(placedCount + 1);
+				chosen[best] = -1;
+				for (const cell of cands[best][ci].cells) used[cell] = 0;
+				if (exhausted) return;
+			}
+		};
+		dfs(0);
+
+		const blocked = [];
+		const blockingIce = new Set();
+		givens.forEach((g, gi) => {
+			const rects = [...seen[gi]].map((ci) => cands[gi][ci]);
+			if (!rects.length) return;
+			const hasClean = rects.some((c) => c.cells.every((cell) => !ice.has(cell)));
+			if (hasClean) return;
+			blocked.push(g);
+			for (const c of rects) for (const cell of c.cells) if (ice.has(cell)) blockingIce.add(cell);
+		});
+		return { solvable: completions > 0, completions, nodes, exhausted, blocked, blockingIce };
+	}
+};
+
+// ===== match.js =====
+// match.js — local VS match: turn loop, mine routing, explosions, clears, FT7.
+// Wraps two PlayerEconomy instances around two real Shikaku boards.
+
+
+
+
+const VS_GEN = { size: 6, maxAreaFrac: 0.32, maxGivens: 10 };
+
+/**
+ * Board `index` of a match's shared sequence. Classic generator untouched; VS
+ * caps givens by retry (oddChance/oddDimLean: original algorithm lost — not yet reimplemented).
+ */
+function vsBoard(seed, index) {
+	for (let k = 0; ; k++) {
+		const s = (seed * 7919 + index * 104729 + k * 15485863) % 2147483646;
+		const p = generatePuzzle(VS_GEN.size, VS_GEN.maxAreaFrac, s);
+		if (p.layout.length <= VS_GEN.maxGivens || k > 50) return { ...p, seed: s };
+	}
+}
+
+const key = (r) => `${r.x1},${r.y1},${r.x2},${r.y2}`;
+
+class Side {
+	constructor(name, rules, seed) {
+		this.name = name;
+		this.econ = new PlayerEconomy(rules, seed);
+		this.boardIndex = 0;
+		this.cleared = 0;
+		this.puzzle = null;
+		this.rects = [];
+	}
+	get N() {
+		return this.puzzle.nums.length;
+	}
+	board() {
+		return { N: this.N, nums: this.puzzle.nums, rects: this.rects };
+	}
+	iceCells() {
+		return new Set(this.econ.frozen.map((f) => f.cell));
+	}
+	/** Engine seam: refuse rects over frozen cells. */
+	isRectBlocked(rc) {
+		const ice = this.iceCells();
+		return rectCellsOf(rc, this.N).some((c) => ice.has(c));
+	}
+}
+
+class VsMatch {
+	constructor({ rules = DEFAULT_RULES, seed = 1, target = 7 } = {}) {
+		this.rules = rules;
+		this.seed = seed;
+		this.target = target;
+		this.score = [0, 0];
+		this.round = 0;
+		this.over = false;
+		this.newRound();
+	}
+
+	newRound() {
+		this.round++;
+		this.roundSeed = this.seed * 1000 + this.round;
+		this.sides = [
+			new Side('you', this.rules, this.roundSeed * 3 + 1),
+			new Side('them', this.rules, this.roundSeed * 3 + 2)
+		];
+		for (const s of this.sides) this._deal(s);
+		this.turn = 0;
+		this.roundOver = null;
+	}
+
+	_deal(side) {
+		side.puzzle = vsBoard(this.roundSeed, side.boardIndex);
+		side.rects = [];
+	}
+
+	/**
+	 * Apply one action for a side. Returns { ticks: boolean, events }.
+	 * action: { type: 'place', ax, ay, bx, by } | { type: 'erase', x, y } | null
+	 */
+	_apply(side, action) {
+		if (!action) return { ticks: false, events: [] };
+		const N = side.N;
+		const state = { nums: side.puzzle.nums, rects: side.rects, N };
+		if (action.type === 'erase') {
+			const res = commit(action.x, action.y, action.x, action.y, state);
+			if (!res.changed) return { ticks: false, events: [] };
+			return { ticks: true, events: side.econ.onErase() };
+		}
+		const probe = new Rect(action.ax, action.ay, action.bx, action.by);
+		if (side.isRectBlocked(probe)) return { ticks: false, events: [], denied: 'ice' };
+		const before = side.rects.length;
+		const res = commit(action.ax, action.ay, action.bx, action.by, state);
+		if (!res.placed) return { ticks: false, events: [], denied: 'invalid' };
+		const removed = before - (side.rects.length - 1);
+		const rc = res.placed;
+		const events = side.econ.onPlacement(rectCellsOf(rc, N), edgeCellsOf(rc, N), {
+			doOver: removed > 0
+		});
+		return { ticks: true, events, placed: rc };
+	}
+
+	/**
+	 * Apply an action for side i right away (client-instant). Placement-side
+	 * effects (defuse, active thaw, combo, clear, sends) resolve immediately.
+	 * Returns { ticks, events, denied }.
+	 */
+	act(i, action) {
+		if (this.over || this.roundOver) return { ticks: false, events: [] };
+		const s = this.sides[i];
+		const out = [];
+		const tag = (evs) => evs.forEach((e) => out.push({ side: s.name, ...e }));
+		const a = this._apply(s, action);
+		if (!a.ticks) return { ticks: false, events: [], denied: a.denied };
+		tag(a.events);
+		tag(s.econ.checkStuckAndForceBreak(s.board()));
+		this._resolveClear(s, out);
+		this._route(out);
+		this._checkRound(out);
+		return { ticks: true, events: out, placed: a.placed };
+	}
+
+	/** Advance both economies one clock step. */
+	tick() {
+		if (this.over || this.roundOver) return { events: [] };
+		const out = [];
+		this.turn++;
+		for (const s of this.sides) {
+			const tag = (evs) => evs.forEach((e) => out.push({ side: s.name, ...e }));
+			const evs = s.econ.tick(freeCellsOf(s.board()));
+			tag(evs);
+			for (const e of evs) if (e.kind === 'mineExplode') tag(this._explode(s, e.cell));
+			tag(s.econ.checkStuckAndForceBreak(s.board()));
+			this._resolveClear(s, out);
+		}
+		this._route(out);
+		this._checkRound(out);
+		return { events: out };
+	}
+
+	/**
+	 * Per-placement clock (decision 4): your action, the opponent's action, then
+	 * one tick. Only ticks if your action changed the board.
+	 */
+	step(youAction, themAction) {
+		const a = this.act(0, youAction);
+		if (!a.ticks) return { events: [], ticked: false, denied: a.denied };
+		const themAct = typeof themAction === 'function' ? themAction(this) : themAction;
+		const b = this.act(1, themAct);
+		const t = this.tick();
+		return { events: [...a.events, ...b.events, ...t.events], ticked: true, placed: a.placed };
+	}
+
+	/** Margin time: attack multiplier that grows once a round runs long. */
+	get marginMultiplier() {
+		const r = this.rules;
+		if (!r.marginStart || this.turn < r.marginStart) return 1;
+		return 1 + Math.floor((this.turn - r.marginStart) / r.marginEvery + 1) * r.marginStep;
+	}
+
+	_resolveClear(s, out) {
+		if (!isSolved(s.rects, s.N)) return;
+		s.econ.onBoardCleared().forEach((e) => out.push({ side: s.name, ...e }));
+		s.cleared++;
+		s.boardIndex++;
+		this._deal(s);
+		out.push({ side: s.name, kind: 'newBoard', index: s.boardIndex });
+	}
+
+	/** Route outgoing mines. Net-cancel: your sends cancel your own incoming first. */
+	_route(out) {
+		const mult = this.marginMultiplier;
+		const sends = this.sides.map((s) => {
+			const raw = s.econ.drainOutgoing();
+			return raw ? Math.round(raw * mult) : 0;
+		});
+		this.sides.forEach((s, i) => {
+			const n = sends[i];
+			if (!n) return;
+			const opp = this.sides[1 - i];
+			const cancelled = this.rules.overflow === 'netCancel' ? s.econ.cancelIncoming(n) : 0;
+			const pass = n - cancelled;
+			if (pass) opp.econ.receiveMines(pass);
+			out.push({ side: s.name, kind: 'send', count: n, cancelled, pass });
+		});
+	}
+
+	/** §5: every rect touching the 3×3 blast is removed whole. Not a do-over. */
+	_explode(side, cell) {
+		const N = side.N;
+		const cx = cell % N;
+		const cy = Math.floor(cell / N);
+		const r = this.rules.blastRadius;
+		const blast = { x1: cx - r, y1: cy - r, x2: cx + r, y2: cy + r };
+		const hit = side.rects.filter(
+			(rc) => rc.x1 <= blast.x2 && rc.x2 >= blast.x1 && rc.y1 <= blast.y2 && rc.y2 >= blast.y1
+		);
+		side.rects = side.rects.filter((rc) => !hit.includes(rc));
+		return hit.length ? [{ kind: 'rectsBlown', cell, count: hit.length }] : [];
+	}
+
+	_checkRound(out) {
+		const [you, them] = this.sides;
+		const yl = you.econ.isDefeated;
+		const tl = them.econ.isDefeated;
+		if (!yl && !tl) return;
+		let winner = null;
+		if (yl && tl) {
+			const d = you.econ.effectiveTemp - them.econ.effectiveTemp;
+			winner = d > 0 ? 0 : d < 0 ? 1 : null;
+		} else winner = yl ? 1 : 0;
+		if (this.roundOver) return;
+		if (winner !== null) this.score[winner]++;
+		this.roundOver = { winner };
+		if (this.score.some((s) => s >= this.target)) this.over = true;
+		out.push({ side: 'match', kind: 'roundOver', winner, score: [...this.score] });
+	}
+}
+
+// —— Replay bot (§: bot parked; this is the stand-in) ——
+// Plays the generator's own solution, one move per turn, with tunable mistakes.
+class ReplayBot {
+	constructor({ misplay = 0.15, idle = 0.25, defuseFirst = 0.7, seed = 99 } = {}) {
+		this.misplay = misplay;
+		this.idle = idle;
+		this.defuseFirst = defuseFirst;
+		this.rng = new Rng(seed);
+	}
+	_roll(p) {
+		return this.rng.nextDouble() < p;
+	}
+
+	/** Decide an action for `side`. */
+	decide(side) {
+		if (this._roll(this.idle)) return null;
+		const N = side.N;
+		const nums = side.puzzle.nums;
+		const sol = side.puzzle.layout;
+		const solKeys = new Set(sol.map(key));
+		const toAction = (rc) => ({ type: 'place', ax: rc.x1, ay: rc.y1, bx: rc.x2, by: rc.y2 });
+
+		// Fix a known-wrong rect first (an overwrite = do-over).
+		const wrong = side.rects.find((rc) => !solKeys.has(key(rc)));
+		if (wrong) {
+			const fix = sol.find((s) => s.overlaps(wrong) && !side.isRectBlocked(s));
+			if (fix) return toAction(fix);
+			return { type: 'erase', x: wrong.x1, y: wrong.y1 }; // fix blocked by ice: clear the way
+		}
+
+		const placed = new Set(side.rects.map(key));
+		let todo = sol.filter((s) => !placed.has(key(s)) && !side.isRectBlocked(s));
+		todo = todo.filter((s) => !side.rects.some((p) => p.overlaps(s)));
+		if (!todo.length) return null; // waiting on ice
+
+		// Prefer defusing the most urgent mine.
+		let pick = null;
+		if (side.econ.mines.length && this._roll(this.defuseFirst)) {
+			const mines = [...side.econ.mines].sort((a, b) => a.fuse - b.fuse);
+			for (const m of mines) {
+				pick = todo.find((s) => s.has(m.cell % N, Math.floor(m.cell / N)));
+				if (pick) break;
+			}
+		}
+		pick ??= todo[this.rng.nextInt(todo.length)];
+
+		// Misplay: a valid-but-wrong rect for the same clue, on empty cells.
+		if (this._roll(this.misplay)) {
+			const alt = this._alternative(pick, side, nums);
+			if (alt) return toAction(alt);
+		}
+		return toAction(pick);
+	}
+
+	_alternative(target, side, nums) {
+		const N = side.N;
+		const area = target.area;
+		let cx = -1,
+			cy = -1;
+		for (let y = target.y1; y <= target.y2; y++)
+			for (let x = target.x1; x <= target.x2; x++) if (nums[y][x]) [cx, cy] = [x, y];
+		const opts = [];
+		for (let w = 1; w <= area; w++) {
+			if (area % w) continue;
+			const h = area / w;
+			for (let x1 = cx - w + 1; x1 <= cx; x1++)
+				for (let y1 = cy - h + 1; y1 <= cy; y1++) {
+					if (x1 < 0 || y1 < 0 || x1 + w > N || y1 + h > N) continue;
+					const r = new Rect(x1, y1, x1 + w - 1, y1 + h - 1);
+					if (key(r) === key(target) || !verifyRect(r, nums)) continue;
+					if (side.isRectBlocked(r) || side.rects.some((p) => p.overlaps(r))) continue;
+					opts.push(r);
+				}
+		}
+		return opts.length ? opts[this.rng.nextInt(opts.length)] : null;
+	}
+}
+
+</script>
+<script>
+// app.js — VS Lab UI. Wrapped in an IIFE so its names never collide with the
+// bundled modules (puzzle.js, game.js, economy.js, match.js) above it.
+(() => {
+	const RULES = { ...DEFAULT_RULES };
+	const BOT = { misplay: 0.2, idle: 0.25, defuseFirst: 0.6, movesPerSec: 0.7 };
+	const CLOCK = { mode: 'move', tickMs: 2000 };
+	const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const $ = (id) => document.getElementById(id);
+
+	let match;
+	let bot;
+	let paused = false;
+	let tickTimer = 0;
+	let botTimer = 0;
+	const logItems = [];
+
+	// —— Theme colors for the canvas ——
+	let C = {};
+	const COLOR_VARS = [
+		'cell', 'num', 'num-on-block', 'drag-fill', 'drag-stroke', 'invalid-fill', 'invalid-stroke',
+		'ice', 'ice-ink', 'mine-3', 'mine-2', 'mine-1', 'good', 'fg', 'bg', 'accent', 'cold'
+	];
+	function readColors() {
+		const cs = getComputedStyle(document.documentElement);
+		C = {};
+		for (const v of COLOR_VARS) C[v] = cs.getPropertyValue('--' + v).trim();
+	}
+	matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+	new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+	// —— Board view (canvas) ——
+	class BoardView {
+		constructor(canvas, sideIdx, interactive) {
+			this.canvas = canvas;
+			this.sideIdx = sideIdx;
+			this.interactive = interactive;
+			this.flashes = [];
+			this.ghost = null;
+			this.drag = null;
+			this.ctx = canvas.getContext('2d');
+			new ResizeObserver(() => this.resize()).observe(canvas);
+			if (interactive) this.bindPointer();
+		}
+		get side() {
+			return match.sides[this.sideIdx];
+		}
+		resize() {
+			const w = Math.max(80, Math.floor(this.canvas.clientWidth));
+			this.dpr = Math.max(1, window.devicePixelRatio || 1);
+			this.S = w;
+			this.canvas.width = Math.round(w * this.dpr);
+			this.canvas.height = Math.round(w * this.dpr);
+		}
+		get N() {
+			return this.side.N;
+		}
+		get cell() {
+			return this.S / this.N;
+		}
+		get gap() {
+			return this.S < 240 ? 3 : 5;
+		}
+		cellAt(e) {
+			const b = this.canvas.getBoundingClientRect();
+			const x = Math.floor(((e.clientX - b.left) / b.width) * this.N);
+			const y = Math.floor(((e.clientY - b.top) / b.height) * this.N);
+			return [Math.min(this.N - 1, Math.max(0, x)), Math.min(this.N - 1, Math.max(0, y))];
+		}
+		bindPointer() {
+			const c = this.canvas;
+			c.addEventListener('pointerdown', (e) => {
+				if (match.roundOver || paused) return;
+				c.setPointerCapture(e.pointerId);
+				const [x, y] = this.cellAt(e);
+				this.drag = { ax: x, ay: y, bx: x, by: y };
+			});
+			c.addEventListener('pointermove', (e) => {
+				if (!this.drag) return;
+				const [x, y] = this.cellAt(e);
+				this.drag.bx = x;
+				this.drag.by = y;
+			});
+			const end = () => {
+				const d = this.drag;
+				this.drag = null;
+				if (!d) return;
+				if (d.ax === d.bx && d.ay === d.by) doAction({ type: 'erase', x: d.ax, y: d.ay });
+				else doAction({ type: 'place', ...d });
+			};
+			c.addEventListener('pointerup', end);
+			c.addEventListener('pointercancel', () => (this.drag = null));
+		}
+		span(r) {
+			const g = this.gap / 2;
+			const k = this.cell;
+			return [r.x1 * k + g, r.y1 * k + g, (r.x2 - r.x1 + 1) * k - this.gap, (r.y2 - r.y1 + 1) * k - this.gap];
+		}
+		rr(x, y, w, h, r = 4) {
+			const c = this.ctx;
+			const q = Math.min(r, w / 2, h / 2);
+			c.beginPath();
+			c.moveTo(x + q, y);
+			c.arcTo(x + w, y, x + w, y + h, q);
+			c.arcTo(x + w, y + h, x, y + h, q);
+			c.arcTo(x, y + h, x, y, q);
+			c.arcTo(x, y, x + w, y, q);
+			c.closePath();
+		}
+		flash(kind, cell, extra = {}) {
+			const now = performance.now();
+			if (kind === 'shatter') {
+				const shards = [];
+				const n = Math.round(10 * (extra.intensity ?? 1)) + 3;
+				for (let i = 0; i < n; i++) {
+					const a = (i / n) * Math.PI * 2 + Math.random() * 0.6;
+					const v = 0.6 + Math.random() * 1.4 * (extra.intensity ?? 1);
+					shards.push({ a, v, s: 0.06 + Math.random() * 0.08, rot: Math.random() * 6 });
+				}
+				this.flashes.push({ kind, cell, start: now, dur: 520, shards });
+			} else this.flashes.push({ kind, cell, start: now, dur: extra.dur ?? 380 });
+		}
+		draw(now) {
+			if (!this.S) return;
+			const c = this.ctx;
+			const side = this.side;
+			const N = this.N;
+			const k = this.cell;
+			const nums = side.puzzle.nums;
+			c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+			c.clearRect(0, 0, this.S, this.S);
+
+			// Empty cells
+			c.fillStyle = C.cell;
+			for (let y = 0; y < N; y++)
+				for (let x = 0; x < N; x++) {
+					this.rr(...this.span({ x1: x, y1: y, x2: x, y2: y }));
+					c.fill();
+				}
+
+			// Ice
+			const fs = Math.max(10, k * 0.42);
+			for (const f of side.econ.frozen) {
+				const x = f.cell % N;
+				const y = Math.floor(f.cell / N);
+				const [px, py, pw, ph] = this.span({ x1: x, y1: y, x2: x, y2: y });
+				c.fillStyle = C.ice;
+				this.rr(px, py, pw, ph);
+				c.fill();
+				c.save();
+				this.rr(px, py, pw, ph);
+				c.clip();
+				c.strokeStyle = C['ice-ink'];
+				c.globalAlpha = 0.18;
+				c.lineWidth = 1;
+				for (let t = -pw; t < pw * 2; t += Math.max(5, pw / 5)) {
+					c.beginPath();
+					c.moveTo(px + t, py);
+					c.lineTo(px + t - ph, py + ph);
+					c.stroke();
+				}
+				c.restore();
+				// thaw pips
+				const total = RULES.thawPoints;
+				const pr = Math.max(1.5, k * 0.045);
+				for (let i = 0; i < total; i++) {
+					c.beginPath();
+					c.arc(px + pw / 2 + (i - (total - 1) / 2) * pr * 3, py + ph - pr * 3, pr, 0, Math.PI * 2);
+					c.fillStyle = C['ice-ink'];
+					c.globalAlpha = i < f.thaw ? 0.85 : 0.2;
+					c.fill();
+				}
+				c.globalAlpha = 1;
+			}
+
+			// Rects
+			for (const r of side.rects) {
+				c.fillStyle = rectColor(r);
+				this.rr(...this.span(r));
+				c.fill();
+			}
+
+			// Mines
+			for (const m of side.econ.mines) {
+				const x = m.cell % N;
+				const y = Math.floor(m.cell / N);
+				const cx = x * k + k / 2;
+				const cy = y * k + k / 2;
+				const col = m.fuse >= 3 ? C['mine-3'] : m.fuse === 2 ? C['mine-2'] : C['mine-1'];
+				const period = m.fuse >= 3 ? 300 : m.fuse === 2 ? 200 : 150;
+				const on = REDUCED || Math.floor(now / period) % 2 === 0;
+				c.beginPath();
+				c.arc(cx, cy, k * 0.3, 0, Math.PI * 2);
+				c.fillStyle = col;
+				c.globalAlpha = on ? 1 : 0.45;
+				c.fill();
+				c.globalAlpha = 1;
+				c.fillStyle = '#ffffff';
+				c.font = `600 ${Math.max(9, k * 0.26)}px ${getComputedStyle(document.body).fontFamily}`;
+				c.textAlign = 'center';
+				c.textBaseline = 'middle';
+				c.fillText(String(m.fuse), cx, cy + 1);
+			}
+
+			// Clue numbers (drawn above mines' rings but below drag)
+			c.font = `${fs}px ${getComputedStyle(document.body).fontFamily}`;
+			c.textAlign = 'center';
+			c.textBaseline = 'middle';
+			const ice = side.iceCells();
+			const mineCells = new Set(side.econ.mines.map((m) => m.cell));
+			for (let y = 0; y < N; y++)
+				for (let x = 0; x < N; x++) {
+					const v = nums[y][x];
+					if (!v) continue;
+					const i = y * N + x;
+					if (mineCells.has(i)) continue;
+					c.fillStyle = ice.has(i) ? C['ice-ink'] : cellUnderBlock(x, y, side.rects) ? C['num-on-block'] : C.num;
+					c.fillText(String(v), x * k + k / 2, y * k + k / 2 + 1);
+				}
+
+			// Drag preview
+			if (this.drag) {
+				const d = this.drag;
+				const r = new Rect(d.ax, d.ay, d.bx, d.by);
+				const blocked = side.isRectBlocked(r);
+				const ok = !blocked && verifyRect(r, nums);
+				c.fillStyle = blocked ? C.ice : ok ? C['drag-fill'] : C['invalid-fill'];
+				c.globalAlpha = blocked ? 0.55 : 1;
+				this.rr(...this.span(r));
+				c.fill();
+				c.globalAlpha = 1;
+				c.strokeStyle = blocked ? C['ice-ink'] : ok ? C['drag-stroke'] : C['invalid-stroke'];
+				c.lineWidth = 2;
+				c.stroke();
+				const [px, py, pw, ph] = this.span(r);
+				c.fillStyle = C.fg;
+				c.font = `600 ${Math.max(11, k * 0.24)}px ${getComputedStyle(document.body).fontFamily}`;
+				if (r.area > 1) c.fillText(`${r.w}×${r.h}`, px + pw / 2, py + ph - Math.max(8, k * 0.16));
+			}
+
+			// Denied ghost
+			if (this.ghost) {
+				const t = (now - this.ghost.start) / 320;
+				if (t >= 1) this.ghost = null;
+				else {
+					c.globalAlpha = 1 - t;
+					c.fillStyle = this.ghost.ice ? C.ice : C['invalid-fill'];
+					this.rr(...this.span(this.ghost.r));
+					c.fill();
+					c.globalAlpha = 1;
+				}
+			}
+
+			// Flashes
+			this.flashes = this.flashes.filter((f) => now - f.start < f.dur);
+			for (const f of this.flashes) {
+				const t = (now - f.start) / f.dur;
+				const x = f.cell % N;
+				const y = Math.floor(f.cell / N);
+				if (f.kind === 'blast') {
+					c.globalAlpha = (1 - t) * 0.85;
+					c.fillStyle = '#ffffff';
+					c.fillRect((x - 1) * k, (y - 1) * k, 3 * k, 3 * k);
+				} else if (f.kind === 'pulse' || f.kind === 'ring') {
+					c.globalAlpha = 1 - t;
+					c.strokeStyle = f.kind === 'pulse' ? '#ffffff' : C.good;
+					c.lineWidth = 3;
+					c.beginPath();
+					c.arc(x * k + k / 2, y * k + k / 2, k * (0.3 + t * 0.45), 0, Math.PI * 2);
+					c.stroke();
+				} else if (f.kind === 'land') {
+					c.globalAlpha = 1 - t;
+					c.strokeStyle = C['mine-1'];
+					c.lineWidth = 2;
+					c.beginPath();
+					c.arc(x * k + k / 2, y * k + k / 2, k * (0.75 - t * 0.4), 0, Math.PI * 2);
+					c.stroke();
+				} else if (f.kind === 'shatter') {
+					const e = 1 - Math.pow(1 - t, 3);
+					c.fillStyle = C.ice;
+					for (const s of f.shards) {
+						c.globalAlpha = 1 - t;
+						const sx = x * k + k / 2 + Math.cos(s.a) * s.v * k * e;
+						const sy = y * k + k / 2 + Math.sin(s.a) * s.v * k * e + t * t * k * 0.5;
+						c.save();
+						c.translate(sx, sy);
+						c.rotate(s.rot + t * 4);
+						c.fillRect(-s.s * k, -s.s * k * 0.6, s.s * k * 2, s.s * k * 1.2);
+						c.restore();
+					}
+				}
+				c.globalAlpha = 1;
+			}
+		}
+	}
+
+	const views = [new BoardView($('you-board'), 0, true), new BoardView($('them-board'), 1, false)];
+
+	function loop(now) {
+		for (const v of views) v.draw(now);
+		requestAnimationFrame(loop);
+	}
+
+	// —— Actions & clock ——
+	function doAction(action) {
+		if (match.roundOver || paused) return;
+		let r;
+		if (CLOCK.mode === 'move') r = match.step(action, (m) => bot.decide(m.sides[1]));
+		else {
+			r = match.act(0, action);
+			r.ticked = r.ticks;
+		}
+		if (!r.ticked && r.denied && action.type === 'place') {
+			views[0].ghost = {
+				r: new Rect(action.ax, action.ay, action.bx, action.by),
+				ice: r.denied === 'ice',
+				start: performance.now()
+			};
+		}
+		handle(r.events);
+	}
+
+	function startRealtime() {
+		stopRealtime();
+		if (CLOCK.mode !== 'real' || paused) return;
+		tickTimer = setInterval(() => handle(match.tick().events), CLOCK.tickMs);
+		botTimer = setInterval(() => handle(match.act(1, bot.decide(match.sides[1])).events), 1000 / BOT.movesPerSec);
+	}
+	function stopRealtime() {
+		clearInterval(tickTimer);
+		clearInterval(botTimer);
+	}
+
+	// —— Events → effects, log, HUD ——
+	const deg = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v * 10) / 10)}°`;
+	function describe(e) {
+		const R = RULES;
+		switch (e.kind) {
+			case 'mineEnqueued': return `${e.count} mine${e.count > 1 ? 's' : ''} incoming in ${e.eta}`;
+			case 'mineLand': return `mine landed (${deg(R.mineLandTemp)})`;
+			case 'mineExplode': return `mine exploded (${deg(R.mineExplodeTemp)})`;
+			case 'rectsBlown': return `blast removed ${e.count} rectangle${e.count > 1 ? 's' : ''}`;
+			case 'defuse': return `defused a mine (${deg(R.mineDefuseTemp)})${e.sends ? ', sends 1' : ''}`;
+			case 'surge': return `surge: ${e.count} banked mine${e.count > 1 ? 's' : ''} landed`;
+			case 'freezeWarn': return `frost warning, lands in ${e.steps}`;
+			case 'freezeAbandon': return 'warmed up, frost called off';
+			case 'frozen': return 'a cell froze';
+			case 'thaw': return `ice thawed (${deg(e.source === 'passive' ? R.passiveThawReward : R.activeThawReward)})`;
+			case 'comboAttack': return `combo ×${e.combo}: sends ${R.comboSend}, decay paused`;
+			case 'comboReset': return `combo ×${e.combo} broken`;
+			case 'forceBreak': return `force break (${deg(R.forceBreakReward)}, sends ${R.forceBreakSend})`;
+			case 'clear': return `board cleared${e.perfect ? `, perfect ×${e.perfectStreak}` : ''} (${deg(R.clearReward)}, sends ${e.send})`;
+			case 'send': return e.cancelled ? `sent ${e.count}: ${e.cancelled} cancelled own incoming, ${e.pass} passed` : `sent ${e.count} mines`;
+			case 'loss': return 'hit −100°';
+			default: return null;
+		}
+	}
+	function handle(events) {
+		if (!events || !events.length) {
+			renderHud();
+			return;
+		}
+		for (const e of events) {
+			const idx = e.side === 'you' ? 0 : e.side === 'them' ? 1 : -1;
+			const v = views[idx];
+			if (v) {
+				if (e.kind === 'newBoard') v.flashes = [];
+				else if (e.kind === 'mineExplode') v.flash('blast', e.cell);
+				else if (e.kind === 'mineLand') v.flash('land', e.cell);
+				else if (e.kind === 'frozen') v.flash('pulse', e.cell);
+				else if (e.kind === 'defuse') v.flash('ring', e.cell);
+				else if (e.kind === 'forceBreak') v.flash('shatter', e.cell, { intensity: 1 });
+				else if (e.kind === 'thaw') v.flash('shatter', e.cell, { intensity: 0.25 });
+			}
+			if (e.kind === 'roundOver') showRoundOver(e);
+			const text = describe(e);
+			if (text) logItems.unshift({ turn: match.turn, side: e.side, text });
+		}
+		logItems.length = Math.min(logItems.length, 160);
+		renderLog();
+		renderHud();
+	}
+
+	function renderLog() {
+		const ul = $('log');
+		ul.innerHTML = '';
+		for (const it of logItems.slice(0, 120)) {
+			const li = document.createElement('li');
+			li.className = it.side;
+			const who = it.side === 'you' ? 'You' : it.side === 'them' ? 'Bot' : '';
+			li.innerHTML = `<span class="t num">${it.turn}</span><span class="who"></span><span class="msg"></span>`;
+			li.children[1].textContent = who;
+			li.children[2].textContent = it.text;
+			ul.appendChild(li);
+		}
+	}
+
+	const pctX = (v) => ((v + 100) / 200) * 100;
+	function renderBar(el, econ) {
+		if (!el.dataset.built) {
+			el.innerHTML = '<div class="promise" title="Raw temperature held down by frozen cells"></div><div class="fill"></div>' +
+				[-75, -50, -25].map((t) => `<div class="tick" style="left:${pctX(t)}%"></div>`).join('') +
+				'<div class="zero"></div><div class="fader"></div>';
+			el.dataset.built = '1';
+		}
+		const eff = econ.effectiveTemp;
+		const raw = econ.temp;
+		const [promise, fill] = el.children;
+		const fader = el.lastElementChild;
+		const a = pctX(0);
+		const b = pctX(eff);
+		fill.style.left = Math.min(a, b) + '%';
+		fill.style.width = Math.abs(b - a) + '%';
+		fill.style.background = eff < 0 ? 'var(--cold)' : 'var(--hot)';
+		fader.style.left = b + '%';
+		if (econ.showPromise) {
+			promise.hidden = false;
+			const p = pctX(raw);
+			promise.style.left = Math.min(b, p) + '%';
+			promise.style.width = Math.abs(p - b) + '%';
+			const pc = raw > 0 ? 'var(--hot-promise)' : 'var(--cold-promise)';
+			promise.style.background = `repeating-linear-gradient(135deg, ${pc} 0 3px, transparent 3px 6px)`;
+		} else promise.hidden = true;
+	}
+
+	function chip(text, cls = '') {
+		return `<span class="chip ${cls}">${text}</span>`;
+	}
+	function renderChips(el, side) {
+		const e = side.econ;
+		const out = [];
+		out.push(chip(`Board <b class="num">${side.boardIndex + 1}</b>`));
+		out.push(chip(`Combo <b class="num">×${e.combo}</b>`, e.combo ? '' : 'dim'));
+		out.push(chip(`Perfect <b class="num">${e.perfectStreak}</b>`, e.perfectStreak ? '' : 'dim'));
+		for (const b of e.mineQueue) out.push(chip(`<b class="num">${b.count}</b> mines in <b class="num">${b.eta}</b>`, 'warn'));
+		if (e.pendingMines) out.push(chip(`<b class="num">${e.pendingMines}</b> queued`, 'warn'));
+		if (e.bank) out.push(chip(`Surge bank <b class="num">${e.bank}</b>`, 'warn'));
+		for (const w of e.freezeQueue) out.push(chip(`Frost in <b class="num">${Math.max(w, 0)}</b>`, 'frost'));
+		if (e.frozen.length) out.push(chip(`<b class="num">${e.frozen.length}</b> frozen, floor <b class="num">${e.floor}°</b>`, 'frost'));
+		el.innerHTML = out.join('');
+	}
+
+	function renderTemp(prefix, econ) {
+		const t = $(prefix + '-temp');
+		const eff = econ.effectiveTemp;
+		t.textContent = deg(eff);
+		t.className = 'temp-read num ' + (eff < 0 ? 'cold' : eff > 0 ? 'hot' : '');
+		$(prefix + '-raw').textContent = econ.showPromise ? `raw ${deg(econ.temp)}` : '';
+	}
+
+	function renderHud() {
+		const [you, them] = match.sides;
+		renderTemp('you', you.econ);
+		renderTemp('them', them.econ);
+		renderBar($('you-bar'), you.econ);
+		renderBar($('them-bar'), them.econ);
+		renderChips($('you-chips'), you);
+		renderChips($('them-chips'), them);
+		$('score').textContent = `${match.score[0]} – ${match.score[1]}`;
+		const m = match.marginMultiplier;
+		$('round-label').textContent =
+			`Round ${match.round} · first to ${match.target} · tick ${match.turn}` + (m > 1 ? ` · attack ×${m.toFixed(2)}` : '');
+	}
+
+	function showRoundOver(e) {
+		const youWon = e.winner === 0;
+		const title = match.over ? (youWon ? 'Match won' : 'Match lost') : e.winner === null ? 'Round drawn' : youWon ? 'Round won' : 'Round lost';
+		$('ov-title').textContent = title;
+		$('ov-sub').textContent = `${match.score[0]} – ${match.score[1]} after ${match.turn} ticks`;
+		$('ov-next').textContent = match.over ? 'New match' : 'Next round';
+		$('overlay').hidden = false;
+		stopRealtime();
+	}
+
+	$('ov-next').addEventListener('click', () => {
+		$('overlay').hidden = true;
+		if (match.over) newMatch();
+		else {
+			match.newRound();
+			logItems.unshift({ turn: 0, side: 'match', text: `round ${match.round} starts` });
+			renderLog();
+			for (const v of views) v.flashes = [];
+			renderHud();
+			startRealtime();
+		}
+	});
+
+	function newMatch() {
+		const seed = Math.floor(Math.random() * 1e6) + 1;
+		match = new VsMatch({ rules: RULES, seed });
+		bot = new ReplayBot({ ...BOT, seed: seed + 17 });
+		logItems.length = 0;
+		logItems.unshift({ turn: 0, side: 'match', text: 'match starts, first to 7' });
+		$('overlay').hidden = true;
+		for (const v of views) v.flashes = [];
+		renderLog();
+		renderHud();
+		startRealtime();
+	}
+
+	// —— Clock controls ——
+	function setClock(mode) {
+		CLOCK.mode = mode;
+		$('clock-move').setAttribute('aria-pressed', String(mode === 'move'));
+		$('clock-real').setAttribute('aria-pressed', String(mode === 'real'));
+		$('pause').hidden = mode !== 'real';
+		paused = false;
+		$('pause').textContent = 'Pause';
+		if (mode === 'real') startRealtime();
+		else stopRealtime();
+	}
+	$('clock-move').addEventListener('click', () => setClock('move'));
+	$('clock-real').addEventListener('click', () => setClock('real'));
+	$('pause').addEventListener('click', () => {
+		paused = !paused;
+		$('pause').textContent = paused ? 'Resume' : 'Pause';
+		if (paused) stopRealtime();
+		else startRealtime();
+	});
+	$('restart').addEventListener('click', newMatch);
+
+	// —— Rules lab ——
+	const pct = (v) => Math.round(v * 100) + '%';
+	const GROUPS = [
+		['Clock & opponent', [
+			{ o: CLOCK, k: 'tickMs', label: 'Tick length (real time)', min: 500, max: 5000, step: 250, fmt: (v) => (v / 1000).toFixed(2) + 's', live: startRealtime },
+			{ o: BOT, k: 'movesPerSec', label: 'Bot moves / sec (real time)', min: 0.1, max: 2.5, step: 0.1, fmt: (v) => v.toFixed(1), live: startRealtime },
+			{ o: BOT, k: 'misplay', label: 'Bot misplays', min: 0, max: 0.8, step: 0.05, fmt: pct, bot: true },
+			{ o: BOT, k: 'idle', label: 'Bot hesitates', min: 0, max: 0.8, step: 0.05, fmt: pct, bot: true },
+			{ o: BOT, k: 'defuseFirst', label: 'Bot defuses first', min: 0, max: 1, step: 0.05, fmt: pct, bot: true }
+		]],
+		['Overflow', [
+			{ k: 'overflow', label: 'Overflow model', options: [['netCancel', 'Net-cancel'], ['passthrough', 'Passthrough']] },
+			{ k: 'surgeAbsorptionCap', label: 'Surge per tick', min: 1, max: 6, step: 1 },
+			{ k: 'surgeUsesStagger', label: 'Surge obeys stagger', toggle: true },
+			{ k: 'zeroBankOnClear', label: 'Clear wipes surge bank', toggle: true },
+			{ k: 'marginStart', label: 'Margin time from tick', min: 0, max: 300, step: 10, fmt: (v) => (v ? String(v) : 'off') },
+			{ k: 'marginStep', label: 'Margin +attack per step', min: 0.05, max: 1, step: 0.05, fmt: pct }
+		]],
+		['Temperature', [
+			{ k: 'clearReward', label: 'Board clear', min: 0, max: 30, step: 1, fmt: deg },
+			{ k: 'decayEvery', label: 'Decay −1 every N ticks', min: 1, max: 6, step: 1 },
+			{ k: 'mineLandTemp', label: 'Mine lands', min: -20, max: 0, step: 0.5, fmt: deg },
+			{ k: 'mineDefuseTemp', label: 'Mine defused', min: 0, max: 15, step: 0.5, fmt: deg },
+			{ k: 'mineExplodeTemp', label: 'Mine explodes', min: -30, max: 0, step: 1, fmt: deg },
+			{ k: 'forceBreakReward', label: 'Force break', min: 0, max: 50, step: 1, fmt: deg },
+			{ k: 'activeThawReward', label: 'Active thaw-out', min: 0, max: 40, step: 1, fmt: deg },
+			{ k: 'passiveThawReward', label: 'Passive thaw-out', min: 0, max: 40, step: 1, fmt: deg }
+		]],
+		['Mines', [
+			{ k: 'mineFuse', label: 'Fuse (ticks)', min: 1, max: 6, step: 1 },
+			{ k: 'activeMineCap', label: 'Max on board', min: 1, max: 8, step: 1 },
+			{ k: 'mineStagger', label: 'Land per tick', min: 1, max: 6, step: 1 },
+			{ k: 'mineEta', label: 'Incoming delay', min: 1, max: 6, step: 1 },
+			{ k: 'mineBatch', label: 'Batch size', min: 1, max: 8, step: 1 }
+		]],
+		['Frost', [
+			{ k: 'freezeThreshold', label: 'Freeze below', min: -60, max: -5, step: 5, fmt: deg },
+			{ k: 'thawPoints', label: 'Thaw points', min: 1, max: 8, step: 1 },
+			{ k: 'activeThaw', label: 'Adjacent thaw', min: 1, max: 4, step: 1 },
+			{ k: 'warnSteps', label: 'Warning ticks', min: 1, max: 6, step: 1 },
+			{ k: 'freezeStagger', label: 'Gap after landing', min: 0, max: 6, step: 1 }
+		]],
+		['Attack', [
+			{ k: 'clearSendBase', label: 'Clear sends', min: 0, max: 10, step: 1 },
+			{ k: 'perfectBonusCap', label: 'Perfect bonus cap', min: 0, max: 8, step: 1 },
+			{ k: 'defusesPerSend', label: 'Defuses per send', min: 1, max: 6, step: 1 },
+			{ k: 'forceBreakSend', label: 'Force break sends', min: 0, max: 6, step: 1 },
+			{ k: 'comboMilestone', label: 'Combo milestone', min: 2, max: 12, step: 1 },
+			{ k: 'comboSend', label: 'Combo sends', min: 0, max: 4, step: 1 }
+		]]
+	];
+
+	function buildRules() {
+		const root = $('groups');
+		root.innerHTML = '';
+		for (const [name, items] of GROUPS) {
+			const fs = document.createElement('fieldset');
+			fs.innerHTML = `<legend>${name}</legend>`;
+			for (const it of items) {
+				const o = it.o ?? RULES;
+				const id = 'r-' + it.k;
+				const row = document.createElement('div');
+				row.className = 'row' + (it.toggle || it.options ? ' toggle' : '');
+				if (it.toggle) {
+					row.innerHTML = `<label for="${id}"></label><input type="checkbox" id="${id}">`;
+					const inp = row.querySelector('input');
+					inp.checked = !!o[it.k];
+					inp.addEventListener('change', () => (o[it.k] = inp.checked));
+				} else if (it.options) {
+					row.innerHTML = `<label for="${id}"></label><select id="${id}">${it.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
+					const sel = row.querySelector('select');
+					sel.value = o[it.k];
+					sel.addEventListener('change', () => (o[it.k] = sel.value));
+				} else {
+					row.innerHTML = `<label for="${id}"></label><input type="range" id="${id}" min="${it.min}" max="${it.max}" step="${it.step}"><output for="${id}"></output>`;
+					const inp = row.querySelector('input');
+					const outEl = row.querySelector('output');
+					const fmt = it.fmt ?? ((v) => String(v));
+					inp.value = o[it.k];
+					outEl.textContent = fmt(Number(o[it.k]));
+					inp.addEventListener('input', () => {
+						const v = Number(inp.value);
+						o[it.k] = v;
+						if (it.bot && bot) bot[it.k] = v;
+						outEl.textContent = fmt(v);
+						renderHud();
+					});
+					if (it.live) inp.addEventListener('change', it.live);
+				}
+				row.querySelector('label').textContent = it.label;
+				fs.appendChild(row);
+			}
+			root.appendChild(fs);
+		}
+	}
+
+	// —— Test tools ——
+	$('t-mines-me').addEventListener('click', () => {
+		match.sides[0].econ.receiveMines(4);
+		handle([{ side: 'them', kind: 'send', count: 4, cancelled: 0, pass: 4 }]);
+	});
+	$('t-mines-bot').addEventListener('click', () => {
+		match.sides[1].econ.receiveMines(4);
+		handle([{ side: 'you', kind: 'send', count: 4, cancelled: 0, pass: 4 }]);
+	});
+	$('t-cold').addEventListener('click', () => {
+		match.sides[0].econ.temp = -40;
+		renderHud();
+	});
+	$('t-reset').addEventListener('click', () => {
+		Object.assign(RULES, DEFAULT_RULES);
+		buildRules();
+		renderHud();
+	});
+	$('t-copy').addEventListener('click', async () => {
+		const btn = $('t-copy');
+		const json = JSON.stringify(RULES, null, 2);
+		try {
+			await navigator.clipboard.writeText(json);
+			btn.textContent = 'Copied';
+		} catch {
+			const ta = document.createElement('textarea');
+			ta.value = json;
+			ta.style.cssText = 'width:100%;height:160px;margin-top:8px;font:12px monospace;background:var(--chip);color:var(--fg);border:0;border-radius:4px';
+			btn.parentElement.after(ta);
+			ta.select();
+			btn.textContent = 'Select and copy below';
+		}
+		setTimeout(() => (btn.textContent = 'Copy rules JSON'), 2000);
+	});
+
+	// Debug handle for the browser console: vsLab.match.sides[0].econ, etc.
+	window.vsLab = { get match() { return match; }, rules: RULES, bot: BOT };
+
+	readColors();
+	buildRules();
+	newMatch();
+	requestAnimationFrame(loop);
+})();
+
+</script>

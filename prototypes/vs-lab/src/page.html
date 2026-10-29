@@ -1,0 +1,235 @@
+<title>Shikaku+ VS Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Antique+B1&family=Shippori+Mincho+B1:wght@600;800&display=swap">
+<style>
+/* Layout: one-screen game lab — your board is the stage, the opponent sits beside
+   it as a smaller mirror, the lab panel (log + rule sliders) runs underneath.
+   Tokens follow the Shikaku+ design system (tokens.css): dark is the brand default. */
+:root {
+	--bg: #1b1b1b;
+	--surface: #232220;
+	--chip: #2f2e2a;
+	--cell: #37311f;
+	--line: rgba(255, 255, 255, 0.09);
+	--fg: #ffffff;
+	--fg2: rgba(255, 255, 255, 0.7);
+	--fg3: rgba(255, 255, 255, 0.45);
+	--accent: #d0b878;
+	--accent-ink: #1b1b1b;
+	--num: #ffffff;
+	--num-on-block: rgba(0, 0, 0, 0.35);
+	--drag-fill: rgba(68, 136, 255, 0.33);
+	--drag-stroke: #4488ff;
+	--invalid-fill: rgba(255, 85, 85, 0.4);
+	--invalid-stroke: #ff5555;
+	--cold: #8098b0;
+	--hot: #d08080;
+	--cold-promise: #4e647a;
+	--hot-promise: #d0b878;
+	--ice: #b9d3e3;
+	--ice-ink: #2b4558;
+	--mine-3: #b04040;
+	--mine-2: #d06060;
+	--mine-1: #ff4040;
+	--good: #88b098;
+	--fader: #ffffff;
+	--overlay: rgba(26, 26, 46, 0.87);
+	--radius: 4px;
+	--font-ui: 'Shippori Antique B1', 'Hiragino Sans', system-ui, sans-serif;
+	--font-brand: 'Shippori Mincho B1', 'Hiragino Mincho ProN', Georgia, serif;
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) {
+		--bg: #f2ede4; --surface: #eae4da; --chip: #ddd8ce; --cell: #e0d8c8;
+		--line: rgba(26, 22, 5, 0.1); --fg: #1a1605; --fg2: rgba(26, 22, 5, 0.7); --fg3: rgba(26, 22, 5, 0.48);
+		--accent: #b89050; --accent-ink: #ffffff; --num: #1a1605; --num-on-block: rgba(255, 255, 255, 0.71);
+		--drag-fill: rgba(51, 102, 204, 0.2); --drag-stroke: #3366cc; --invalid-fill: rgba(255, 68, 68, 0.27); --invalid-stroke: #cc3333;
+		--cold: #5f7d9c; --hot: #c06a6a; --cold-promise: #8fa3b8; --hot-promise: #d6bf86;
+		--ice: #cfe2ee; --ice-ink: #2b4558; --good: #5f8f74; --fader: #1a1605; --overlay: rgba(240, 235, 224, 0.93);
+		color-scheme: light;
+	}
+}
+:root[data-theme='light'] {
+	--bg: #f2ede4; --surface: #eae4da; --chip: #ddd8ce; --cell: #e0d8c8;
+	--line: rgba(26, 22, 5, 0.1); --fg: #1a1605; --fg2: rgba(26, 22, 5, 0.7); --fg3: rgba(26, 22, 5, 0.48);
+	--accent: #b89050; --accent-ink: #ffffff; --num: #1a1605; --num-on-block: rgba(255, 255, 255, 0.71);
+	--drag-fill: rgba(51, 102, 204, 0.2); --drag-stroke: #3366cc; --invalid-fill: rgba(255, 68, 68, 0.27); --invalid-stroke: #cc3333;
+	--cold: #5f7d9c; --hot: #c06a6a; --cold-promise: #8fa3b8; --hot-promise: #d6bf86;
+	--ice: #cfe2ee; --ice-ink: #2b4558; --good: #5f8f74; --fader: #1a1605; --overlay: rgba(240, 235, 224, 0.93);
+	color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font-ui);
+	font-size: 14px;
+	line-height: 1.45;
+	padding-left: max(16px, env(safe-area-inset-left, 0px));
+	padding-right: max(16px, env(safe-area-inset-right, 0px));
+	padding-block: 12px 32px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--drag-stroke); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* —— Top bar —— */
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-brand); font-weight: 800; font-size: 22px; letter-spacing: 0.01em; margin: 0; }
+.brand span { color: var(--accent); }
+.score { display: flex; align-items: baseline; gap: 8px; margin-left: auto; }
+.score b { font-family: var(--font-brand); font-size: 22px; font-weight: 800; }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg3); }
+.seg { display: inline-flex; background: var(--chip); border-radius: var(--radius); padding: 2px; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: var(--radius); color: var(--fg2); }
+.seg button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+.btn { border: 0; border-radius: var(--radius); background: var(--chip); padding: 6px 12px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+
+/* —— Arena —— */
+.arena { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.player { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.phead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pname { font-family: var(--font-brand); font-weight: 800; font-size: 17px; }
+.temp-read { margin-left: auto; font-family: var(--font-brand); font-weight: 800; font-size: 26px; line-height: 1; }
+.temp-read.cold { color: var(--cold); }
+.temp-read.hot { color: var(--hot); }
+.raw { font-size: 12px; color: var(--fg3); }
+
+.tbar { position: relative; height: 16px; background: var(--chip); border-radius: var(--radius); overflow: hidden; }
+.tbar .fill, .tbar .promise { position: absolute; top: 0; bottom: 0; }
+.tbar .promise { z-index: 1; border-left: 1px solid var(--fg3); border-right: 1px solid var(--fg3); }
+.tbar .zero { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--fg3); }
+.tbar .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.tbar .fader { position: absolute; top: -1px; bottom: -1px; width: 3px; margin-left: -1px; background: var(--fader); border-radius: 1px; }
+.tscale { display: flex; justify-content: space-between; font-size: 10px; color: var(--fg3); margin-top: -4px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: var(--radius); padding: 3px 8px; font-size: 12px; color: var(--fg2); display: inline-flex; gap: 5px; align-items: center; }
+.chip b { color: var(--fg); font-weight: 400; }
+.chip.warn { background: color-mix(in srgb, var(--mine-3) 32%, var(--chip)); color: var(--fg); }
+.chip.frost { background: color-mix(in srgb, var(--ice) 26%, var(--chip)); color: var(--fg); }
+.chip.dim { opacity: 0.55; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.stage { position: relative; }
+canvas.board { display: block; width: 100%; height: auto; aspect-ratio: 1; max-width: 100%; touch-action: none; border-radius: var(--radius); }
+.player.them canvas.board { max-width: 300px; }
+.overlay { position: absolute; inset: 0; background: var(--overlay); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--radius); text-align: center; padding: 16px; }
+.overlay h2 { font-family: var(--font-brand); font-size: 30px; margin: 0; }
+.hint { font-size: 12px; color: var(--fg3); margin: 0; }
+
+/* —— Lab —— */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
+.panel { background: var(--surface); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.panel h3 { font-family: var(--font-brand); font-size: 15px; margin: 0 0 8px; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.log li { display: grid; grid-template-columns: 34px 40px minmax(0, 1fr); gap: 6px; color: var(--fg2); }
+.log li .t { color: var(--fg3); }
+.log li.you .who { color: var(--accent); }
+.log li.them .who { color: var(--cold); }
+.log li.match { color: var(--fg); }
+.find { border-left: 2px solid var(--accent); padding: 4px 0 4px 10px; color: var(--fg2); font-size: 12.5px; margin: 0 0 10px; max-width: 65ch; }
+.groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px 20px; }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); padding: 0; margin-bottom: 4px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 42px; gap: 8px; align-items: center; font-size: 12.5px; }
+.row label { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row output { text-align: right; font-variant-numeric: tabular-nums; }
+.row input[type='range'] { width: 100%; accent-color: var(--accent); }
+.row.toggle { grid-template-columns: minmax(0, 1fr) auto; }
+.row select { background: var(--chip); border: 0; border-radius: var(--radius); padding: 3px 6px; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tools .btn { font-size: 12.5px; padding: 5px 10px; }
+details.lab-rules > summary { cursor: pointer; font-family: var(--font-brand); font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.lab-rules > summary::-webkit-details-marker { display: none; }
+details.lab-rules > summary::before { content: '+'; color: var(--accent); width: 12px; }
+details.lab-rules[open] > summary::before { content: '−'; }
+details.lab-rules[open] > summary { margin-bottom: 10px; }
+
+@media (max-width: 760px) {
+	.arena { grid-template-columns: minmax(0, 1fr); }
+	.player.them { order: -1; }
+	.player.them canvas.board { max-width: 170px; }
+	.lab { grid-template-columns: minmax(0, 1fr); }
+	.score { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+	<header class="top">
+		<h1 class="brand">Shikaku<span>+</span> VS Lab</h1>
+		<div class="seg" role="group" aria-label="Clock">
+			<button id="clock-move" aria-pressed="true">Per move</button>
+			<button id="clock-real" aria-pressed="false">Real time</button>
+		</div>
+		<button class="btn" id="pause" hidden>Pause</button>
+		<div class="score">
+			<span class="label" id="round-label">Round 1 · first to 7</span>
+			<b class="num" id="score">0 – 0</b>
+		</div>
+		<button class="btn" id="restart">New match</button>
+	</header>
+
+	<main class="arena">
+		<section class="player you" aria-label="Your board">
+			<div class="phead">
+				<span class="pname">You</span>
+				<span class="raw num" id="you-raw"></span>
+				<span class="temp-read num" id="you-temp">0°</span>
+			</div>
+			<div class="tbar" id="you-bar"></div>
+			<div class="tscale num"><span>−100</span><span>−50</span><span>0</span><span>+50</span><span>+100</span></div>
+			<div class="chips" id="you-chips"></div>
+			<div class="stage">
+				<canvas class="board" id="you-board" aria-label="Your Shikaku board"></canvas>
+				<div class="overlay" id="overlay" hidden>
+					<h2 id="ov-title">Round won</h2>
+					<p class="hint" id="ov-sub"></p>
+					<button class="btn primary" id="ov-next">Next round</button>
+				</div>
+			</div>
+			<p class="hint">Drag to place a rectangle. Tap a rectangle to erase it. Cover a mine with a finished rectangle to defuse it. Frozen cells refuse rectangles; build next to them to thaw.</p>
+		</section>
+
+		<section class="player them" aria-label="Opponent board">
+			<div class="phead">
+				<span class="pname">Bot</span>
+				<span class="raw num" id="them-raw"></span>
+				<span class="temp-read num" id="them-temp">0°</span>
+			</div>
+			<div class="tbar" id="them-bar"></div>
+			<div class="chips" id="them-chips"></div>
+			<canvas class="board" id="them-board" aria-label="Opponent board"></canvas>
+		</section>
+	</main>
+
+	<section class="lab">
+		<div class="panel">
+			<h3>Match log</h3>
+			<ul class="log" id="log"></ul>
+		</div>
+		<div class="panel">
+			<details class="lab-rules" id="rules-details" open>
+				<summary>Rules lab</summary>
+				<p class="find">Bot-vs-bot finding: with net-cancel on, two equally good players never lose. Their clears cancel each other's mines and each clear adds +15°. Switch Overflow to passthrough, or turn on margin time, to break the stalemate.</p>
+				<div class="groups" id="groups"></div>
+				<div class="tools">
+					<button class="btn" id="t-mines-me">Send me 4 mines</button>
+					<button class="btn" id="t-mines-bot">Send bot 4 mines</button>
+					<button class="btn" id="t-cold">Set me to −40°</button>
+					<button class="btn" id="t-reset">Reset rules</button>
+					<button class="btn" id="t-copy">Copy rules JSON</button>
+				</div>
+			</details>
+		</div>
+	</section>
+</div>

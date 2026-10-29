@@ -1,0 +1,46 @@
+# Status
+
+Last updated: 2026-10-30.
+
+Newest items at the top of each list. Tick items off (`[x]`) with the date; never delete them.
+
+## Right now
+
+- **Players:** about to pass 100, with no promotion; 100+ downloads on Google Play (Krischan, 2026-10-30).
+- **Install size:** about 9MB on Google Play, a point of pride.
+- **Live:** the app at version 1.26.7.2 on web (`shikaku.plus`) and Android; landing page and blog at `go.shikaku.plus`.
+- **Modes live:** Zen, Time Attack, Blitz, the daily puzzle, Help Me!. Tekazu is built but hidden; Mosaic is retired.
+- **Lost to the 2026 drive failure:** the Flutter Versus mode (about 99% done), the offline-mode work, and the app's design docs (`CLAUDE.md`, `DESIGN_SYSTEM.md`, `KEYBOARD_NAV.md`, `SHIP_CHECKLIST.md`; see [codebase/lost-docs.md](../codebase/lost-docs.md)).
+- **Versus:** rules settled as Fuse & Frost; playable prototype with bots in [prototypes/vs-lab/](../prototypes/vs-lab/).
+
+## Checklist
+
+### To do
+
+- [ ] Make `work-week/shikaku-plus-copy` private or delete it; it was public only so this wiki could be written
+- [ ] Ship offline mode again (Krischan: "I badly need to ship the offline mode"); first pin down what it covered ([open questions](open-questions.md))
+- [ ] Versus readability: what each hazard means at a glance, first-match experience ([versus/fuse-and-frost.md](../versus/fuse-and-frost.md))
+- [ ] Settle Versus open questions: pool freezing, mines vs ice balance
+- [ ] Port the Versus economy to Dart, checked against vectors from the JS prototype ([versus/README.md](../versus/README.md#path-to-shipping))
+- [ ] Decide the Versus server ([decision 0005](../decisions/0005-cloudflare-for-versus.md))
+- [ ] Check that `go.shikaku.plus/support` resolves ([open questions](open-questions.md))
+- [ ] Rewrite or recover the lost design docs, or confirm this wiki replaces them
+- [ ] Back up the Android release keystore somewhere other than one drive
+- [ ] Real fix for the resume prompt: never save a solved board, then turn `kResumeGameEnabled` back on
+
+### Done
+
+- [x] 2026-10-30 Wiki and knowledge base set up in `s-ging/shikaku-plus-info`, with the Versus prototype, archives and the board tool ([log](../logs/2026-10-30-knowledge-base-setup.md))
+- [x] 2026-10-29 Versus redesigned as Fuse & Frost; playable lab with five bot presets, 40 tests and simulations ([log](../logs/2026-10-29-versus-rebuild.md))
+- [x] 2026-07-05 Blitz went public
+- [x] 2026-06 Mosaic soft-retired; domain moved from `shikaku-plus.pages.dev` to `shikaku.plus`
+
+## Blocked on
+
+- Nothing outside Krischan's own time. Versus online play needs a server decision first.
+
+## Known issues
+
+- `go.shikaku.plus/support` has no matching route in the landing repo (unverified whether a redirect exists).
+- The leaderboard layout has never been checked by eye in a running build (its own header says so).
+- Hokan Brutal's target scoring doesn't match its code comment.
