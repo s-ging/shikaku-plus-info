@@ -67,7 +67,9 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 
 ## The frame (2026-10-30)
 
-**Footer, updated later that day:** time on the left; your name with a **live `+N`**, what your clear would send right now (base 4 plus whatever the counter-spike would cancel, with rush), bright when it would counter-spike; the **frost pill** on the right. The opponent's footer shows their `+N` too, so you can see when they're loaded. Left pole is you, right bar is what's coming at you, the footer is what you're sending.
+**Attack chips (2026-10-30, replaces the live `+N`):** the live number by the name jittered too much to read (it moved whenever the bank changed). Now the number itself flies: a chip with the count arcs from the sender's board to the receiver's hazard bar. Orange means mines; big and white means a counter-spike; blue `❄N` means frost, leaving from the pill. Krischan: "I'd like a visual when I send mines - the number". The section below is the earlier version.
+
+**Footer, updated earlier that day (superseded):** time on the left; your name with a **live `+N`**, what your clear would send right now (base 4 plus whatever the counter-spike would cancel, with rush), bright when it would counter-spike; the **frost pill** on the right. The opponent's footer shows their `+N` too, so you can see when they're loaded. Left pole is you, right bar is what's coming at you, the footer is what you're sending.
 
 
 Krischan's layout, TETR.IO-clean and symmetrical: **left pole = you, right pole = what's coming at you.**
