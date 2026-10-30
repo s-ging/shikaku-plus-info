@@ -37,6 +37,8 @@ Placed boxes take one of eight colors, chosen from the box's coordinates so a bo
 
 Versus (from Krischan's comps, [versus/design/](../versus/design/)): mines in rose `#D08080` with an ink fuse pie, ice in blue `#80B3E6` with hatching and a thaw wedge.
 
+**Versus box colour (Krischan, 2026-10-30):** every placed box in VS is lavender `#A090C0`, not the 8-colour palette. The palette's rose and slate blue collided with mines and ice. In VS the hazards are the only saturated colours on the board: red means mines, orange means the mine bank, blue means ice and frost.
+
 ### Type
 
 All three faces ship as **subsets** to keep the install small (about 410KB of fonts in total), under the SIL Open Font License.
@@ -71,6 +73,17 @@ The rules the code comments attribute to `CLAUDE.md`. They exist because the web
 8. **Timed modes use a faster board reveal** (250ms instead of 750ms) so the play loop isn't gated on animation.
 9. **No external hosts.** Flags, badges and fonts are bundled. The game works fully offline.
 10. **Versus hazards** animate through `CustomPainter.repaint()` only, never `setState` in a ticker, and the board is never wrapped in a widget that rebuilds on a timer ([versus/README.md](../versus/README.md)).
+
+### Versus rendering guardrails (Krischan, 2026-10-30)
+
+Restated from the original design doc for the Versus port:
+
+- **CustomPainter for everything in play.** Every cell, every game event (mines, ice, blasts, projectiles) and the game chrome (hearts pole, hazard bar, frost pill, fire meter) is painted, never a widget per cell or per event.
+- **Low-end devices get transforms and alpha only.** Move, scale, and fade, nothing else: no snow, no particles, no looping ambient effects. The target is "Pentium or Athlon, Android Jelly Bean, iOS 12" performant, which Krischan calls "irrational but necessary".
+  - Fading here means painting with a pre-multiplied alpha colour inside the painter, never an `Opacity` widget (rule 2 above).
+  - Whether current Flutter still runs on Jelly Bean and iOS 12 is unverified; the web build may be the path for very old devices.
+- **The bare game must read fully with every effect off.** Effects added later are a bonus layer, never needed to understand the state.
+- **The lab breaks this today and isn't the reference for rendering.** It redraws every frame and loops the heartbeat, the next-move blink and the snow. Port the rules, not the lab's drawing.
 
 ## Offline doctrine
 

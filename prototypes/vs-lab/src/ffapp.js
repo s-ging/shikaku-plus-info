@@ -35,6 +35,8 @@
 		for (const v of ['cell', 'hatch', 'fg', 'mine', 'ice', 'ink', 'num-on-block', 'drag-fill', 'drag-stroke', 'invalid-fill', 'card'])
 			C[v] = cs.getPropertyValue('--' + v).trim();
 	}
+	// Lavender from the box palette. game.js's rectColor stays untouched (copied from the landing repo).
+	const VS_BOX = '#A090C0';
 	const FONT = () => getComputedStyle(document.body).fontFamily;
 
 	class BoardView {
@@ -259,7 +261,7 @@
 				c.fillText(String(Math.max(0, w.eta)), px + pw - 5, py + 4);
 			}
 			for (const r of side.rects) {
-				c.fillStyle = rectColor(r);
+				c.fillStyle = VS_BOX; // one colour for every box in VS (Krischan, 2026-10-30): hazards are the only colours on the board
 				this.rr(...this.span(r));
 				c.fill();
 			}
