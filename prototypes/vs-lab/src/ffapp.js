@@ -490,6 +490,8 @@
 			if (e.kind === 'clear' && e.defuseBonus && v) callout(v, `DEFUSE CLEAR +${e.defuseBonus}`);
 			if (e.kind === 'heal' && e.healed) pulseHearts(e.side);
 			if (e.kind === 'send' && e.pass > 0) fire(e.side === 'you' ? 0 : 1, e.pass, !!e.counter);
+			// Tetris-style call on the sender's board, like DOUBLE or QUAD: what the clear just sent.
+			if (e.kind === 'send' && e.pass > 0 && v) callout(v, e.counter ? `COUNTER-SPIKE ${e.pass}` : `SENT ${e.pass}`);
 			if (e.kind === 'frostFire') frostShot(e.side === 'you' ? 0 : 1, e.count);
 			if (e.kind === 'clutch' && v) callout(v, e.cancelled ? `CLUTCH −${e.cancelled}` : 'CLUTCH');
 			if (e.kind === 'frozen') iceFlashUntil[e.side === 'you' ? 0 : 1] = performance.now() + 260;
@@ -506,6 +508,7 @@
 	function callout(view, text) {
 		const host = view.canvas.parentElement;
 		const el = Object.assign(document.createElement('div'), { className: 'callout', textContent: text });
+		el.style.marginTop = `${host.querySelectorAll('.callout').length * 30}px`; // stack, don't overlap
 		host.appendChild(el);
 		setTimeout(() => el.remove(), REDUCED ? 700 : 1100);
 	}
