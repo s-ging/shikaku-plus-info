@@ -2,6 +2,8 @@
 
 Playable prototype of Shikaku+ VS mode. The current ruleset is **Shikaku+ VS** (design name Fuse & Frost, hence the `ff` file names) ([versus/fuse-and-frost.md](../../versus/fuse-and-frost.md)): `src/fusefrost.js` + `src/ffmatch.js`, UI in `src/ffpage.html` + `src/ffapp.js`, tests in `test/fusefrost.test.js`, sim in `test/ffsim.js`. `node build.mjs` produces `dist/shikaku-vs-lab.html` (Fuse & Frost) and `dist/temperature-lab.html` (the original temperature economy, kept for reference).
 
+**Watch bots** (button under the boards): a bot plays the left board too, with its own difficulty and 1×/2×/4× speed, and rounds roll on by themselves. Added 2026-10-30 so Krischan could watch matches when he couldn't play.
+
 **Ideas from play-testing**, built and parked: [PARKED.md](PARKED.md).
 
 The rest of this README describes the original temperature prototype, built from the [temperature handoff](../../versus/archive/2026-10-29-temperature-handoff.md). It is a separate codebase; it never touches `shikaku-plus` or `shikaku-plus-landing`.

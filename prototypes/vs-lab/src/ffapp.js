@@ -14,6 +14,14 @@
 	let roundStart = performance.now();
 	let pausedAt = 0;
 	const logItems = [];
+	// Watch mode: a bot plays the left board too, and rounds roll on by themselves.
+	let watching = false;
+	let leftKey = 'hard';
+	const LEFT = { ...BOT_PRESETS.hard };
+	let leftBot = null;
+	let leftTimer = 0;
+	let leftBoard = 0;
+	let speed = 1;
 	// Round log (for "Copy round log"): every event with time, side and that side's move number.
 	let roundLog = [];
 	let lastRoundLog = null;
@@ -71,6 +79,7 @@
 		bind() {
 			const c = this.canvas;
 			c.addEventListener('pointerdown', (e) => {
+				if (watching) return;
 				if (match.roundOver) return;
 				c.setPointerCapture(e.pointerId);
 				const [x, y] = this.cellAt(e);
@@ -386,13 +395,31 @@
 			views[0].ghost = { r: new Rect(action.ax, action.ay, action.bx, action.by), ice: r.denied === 'ice', start: performance.now() };
 		handle(r.events);
 	}
+	function scheduleLeft() {
+		clearTimeout(leftTimer);
+		if (!watching || paused || !match || match.roundOver) return;
+		const jitter = 0.6 + Math.random() * 0.8;
+		const side = match.sides[0];
+		const reading = side.boardIndex !== leftBoard ? LEFT.read : 0;
+		leftBoard = side.boardIndex;
+		leftTimer = setTimeout(() => {
+			if (!watching || paused || match.roundOver) return;
+			const r = match.act(0, leftBot.decide(match.sides[0]));
+			if (r.moved) {
+				moveNo[0]++;
+				if (BOT.mirror) botMove(0.2 + Math.random() * 0.25);
+			}
+			handle(r.events);
+			scheduleLeft();
+		}, ((LEFT.secs * jitter + reading) * 1000) / speed);
+	}
 	function botMove(delay) {
 		setTimeout(() => {
 			if (paused || !match || match.roundOver) return;
 			const r = match.act(1, bot.decide(match.sides[1]));
 			if (r.moved) moveNo[1]++;
 			handle(r.events);
-		}, delay * 1000);
+		}, (delay * 1000) / speed);
 	}
 	function scheduleBot() {
 		clearTimeout(botTimer);
@@ -413,7 +440,7 @@
 			}
 			handle(r.events);
 			scheduleBot();
-		}, (BOT.secs * jitter + reading) * 1000);
+		}, ((BOT.secs * jitter + reading) * 1000) / speed);
 	}
 
 	// —— Events ——
@@ -503,7 +530,7 @@
 			li.className = it.side;
 			const who = document.createElement('span');
 			who.className = 'who';
-			who.textContent = it.side === 'you' ? 'You' : it.side === 'them' ? 'Bot' : '';
+			who.textContent = it.side === 'you' ? (watching ? 'Left' : 'You') : it.side === 'them' ? (watching ? 'Right' : 'Bot') : '';
 			const msg = document.createElement('span');
 			msg.textContent = it.text;
 			li.append(who, document.createTextNode(' '), msg);
@@ -708,10 +735,12 @@
 		const youWon = e.winner === 0;
 		$('ov-title').textContent = match.over ? (youWon ? 'Match won' : 'Match lost') : e.winner === null ? 'Double KO' : youWon ? 'Round won' : 'Round lost';
 		const how = e.by === 'ice' ? 'froze over' : 'ran out of hearts';
-		$('ov-sub').textContent = `${youWon ? 'Bot' : 'You'} ${how}. ${match.score[0]} – ${match.score[1]}`;
+		$('ov-sub').textContent = `${youWon ? (watching ? 'Right bot' : 'Bot') : watching ? 'Left bot' : 'You'} ${how}. ${match.score[0]} – ${match.score[1]}`;
 		$('ov-next').textContent = match.over ? 'New match' : 'Next round';
 		$('overlay').hidden = false;
 		clearTimeout(botTimer);
+		clearTimeout(leftTimer);
+		if (watching) setTimeout(() => watching && !$('overlay').hidden && $('ov-next').click(), 2500 / speed);
 	}
 	$('ov-next').addEventListener('click', () => {
 		$('overlay').hidden = true;
@@ -767,11 +796,14 @@
 		renderLog();
 		renderHud();
 		scheduleBot();
+		leftBoard = 0;
+		scheduleLeft();
 	}
 	function newMatch() {
 		const seed = Math.floor(Math.random() * 1e6) + 1;
 		match = new FFMatch({ rules: RULES, seed });
 		bot = new TiltBot({ ...BOT, seed: seed + 17 });
+		leftBot = new TiltBot({ ...LEFT, seed: seed + 5 });
 		logItems.length = 0;
 		$('overlay').hidden = true;
 		startRound('match starts, first to 7');
@@ -783,12 +815,56 @@
 		if (paused) {
 			pausedAt = performance.now();
 			clearTimeout(botTimer);
+			clearTimeout(leftTimer);
 		} else {
 			roundStart += performance.now() - pausedAt;
 			lastYouTick = performance.now();
 			scheduleBot();
+			scheduleLeft();
 		}
 	});
+
+	// —— Watch bots ——
+	function setWho() {
+		const label = (id, text) => {
+			const el = document.querySelector(`#${id}-fire`).parentElement;
+			el.firstChild.nodeValue = text;
+		};
+		label('you', watching ? `${LEFT.label} bot` : 'You');
+		label('them', watching ? `${BOT.label} bot` : 'Bot');
+	}
+	$('watch').addEventListener('click', () => {
+		watching = !watching;
+		$('watch').setAttribute('aria-pressed', String(watching));
+		$('watch').textContent = watching ? 'Stop watching' : 'Watch bots';
+		$('watch-row').hidden = !watching;
+		setWho();
+		newMatch();
+	});
+	function setLeft(key) {
+		leftKey = key;
+		Object.assign(LEFT, BOT_PRESETS[key]);
+		if (leftBot) Object.assign(leftBot, { baseMisplay: LEFT.misplay, tiltPerMine: LEFT.tiltPerMine, tiltPerHeart: LEFT.tiltPerHeart, defuseFirst: LEFT.defuseFirst, counterHold: LEFT.counterHold ?? 0 });
+		for (const b of document.querySelectorAll('#left-presets button')) b.setAttribute('aria-pressed', String(b.dataset.key === key));
+		setWho();
+	}
+	for (const [key, pr] of Object.entries(BOT_PRESETS)) {
+		if (pr.mirror) continue; // Mirror copies a human; on the left there's nobody to copy
+		const b = Object.assign(document.createElement('button'), { textContent: pr.label, type: 'button' });
+		b.dataset.key = key;
+		b.setAttribute('aria-pressed', String(key === leftKey));
+		b.addEventListener('click', () => setLeft(key));
+		$('left-presets').appendChild(b);
+	}
+	for (const x of [1, 2, 4]) {
+		const b = Object.assign(document.createElement('button'), { textContent: `${x}×`, type: 'button' });
+		b.setAttribute('aria-pressed', String(x === speed));
+		b.addEventListener('click', () => {
+			speed = x;
+			for (const o of document.querySelectorAll('#speeds button')) o.setAttribute('aria-pressed', String(o === b));
+		});
+		$('speeds').appendChild(b);
+	}
 
 	// —— Bot presets ——
 	function setPreset(key) {
@@ -797,6 +873,7 @@
 		if (!BOT_PRESETS[key].mirror) delete BOT.mirror;
 		if (bot) Object.assign(bot, { baseMisplay: BOT.misplay, tiltPerMine: BOT.tiltPerMine, tiltPerHeart: BOT.tiltPerHeart, defuseFirst: BOT.defuseFirst, counterHold: BOT.counterHold ?? 0 });
 		for (const b of document.querySelectorAll('#presets button')) b.setAttribute('aria-pressed', String(b.dataset.key === key));
+		if (watching) setWho();
 		buildRules();
 		scheduleBot();
 	}

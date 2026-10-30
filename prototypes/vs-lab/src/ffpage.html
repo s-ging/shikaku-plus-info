@@ -121,7 +121,10 @@ canvas.board { display: block; width: 100%; height: auto; aspect-ratio: 1; touch
 .overlay p { margin: 0; color: var(--fg2); }
 .btn { border: 0; border-radius: 6px; background: var(--cell); padding: 7px 14px; }
 .btn.primary { background: var(--accent); color: var(--ink); }
-.controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; align-items: center; }
+#watch-row { margin-top: 8px; }
+.watch-label { font-size: 13px; color: var(--fg2); }
+#watch[aria-pressed="true"] { background: var(--you); color: var(--ink, #1b1b1b); }
 .seg { display: inline-flex; background: var(--card); border-radius: 6px; padding: 3px; flex-wrap: wrap; }
 .seg button { border: 0; background: transparent; color: var(--fg2); padding: 5px 11px; border-radius: 4px; }
 .seg button[aria-pressed='true'] { background: var(--accent); color: var(--ink); }
@@ -220,8 +223,15 @@ legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; col
 	<p class="hint">Drag to place a box, tap one to erase it. Your board only moves when you do. Mines land in clumps in the biggest open box: cover them to defuse. Defuse early to charge your frost (blue pill, bottom right), which fires ice at the other board when full, or with your clear on your last 4 boxes. Cover a mine on its last tick for a clutch: it cancels one of your incoming. After a clear, nothing lands on your first move, so read the board.</p>
 	<div class="controls">
 		<div class="seg" id="presets" role="group" aria-label="Bot difficulty"></div>
+		<button class="btn" id="watch" aria-pressed="false">Watch bots</button>
 		<button class="btn" id="pause">Pause</button>
 		<button class="btn" id="restart">New match</button>
+	</div>
+	<div class="controls" id="watch-row" hidden>
+		<span class="watch-label">Left bot</span>
+		<div class="seg" id="left-presets" role="group" aria-label="Left bot difficulty"></div>
+		<span class="watch-label">Speed</span>
+		<div class="seg" id="speeds" role="group" aria-label="Playback speed"></div>
 	</div>
 
 	<section class="lab">
