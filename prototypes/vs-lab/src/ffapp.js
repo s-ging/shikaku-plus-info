@@ -620,28 +620,36 @@
 		ice.title = e.iceIncoming.length ? `${e.iceIncoming.length} ice on the way` : 'No ice on the way';
 	}
 
-	// —— Attacks: the number itself flies. A chip with the count arcs from the sender's
-	// board to the receiver's hazard bar (mines: orange, counter-spike: big and white,
-	// frost: blue). Transform and opacity only, per the low-end guardrails.
-	function chip(fromRect, toRect, text, kind, delay = 0) {
-		const el = Object.assign(document.createElement('div'), { className: 'chip ' + kind, textContent: text });
-		document.body.appendChild(el);
-		const x0 = fromRect.left + fromRect.width / 2, y0 = fromRect.top + fromRect.height / 2;
-		const x1 = toRect.left + toRect.width / 2, y1 = toRect.top + toRect.height / 2;
-		const lift = -Math.max(50, Math.abs(x1 - x0) * 0.28);
-		const at = (x, y, sc, op) => ({ transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${sc})`, opacity: op });
-		el.animate(
-			[at(x0, y0, 0.8, 0), at(x0, y0 - 12, 1.1, 1), at((x0 + x1) / 2, (y0 + y1) / 2 + lift, 1, 1), at(x1, y1, 0.7, 1), at(x1, y1, 0.7, 0)],
-			{ duration: REDUCED ? 1 : 760, delay, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'both' }
-		).onfinish = () => el.remove();
-	}
+	// —— Attacks: a +N by your name, and a projectile across to the other board ——
 	function fire(idx, count, big) {
+		const prefix = idx === 0 ? 'you' : 'them';
+		const meter = $(prefix + '-fire');
+		const pop = Object.assign(document.createElement('span'), { className: 'pop' + (big ? ' big' : ''), textContent: `+${count}` });
+		meter.appendChild(pop);
+		setTimeout(() => pop.remove(), 950);
 		if (REDUCED) return;
-		const from = $((idx === 0 ? 'you' : 'them') + '-board').getBoundingClientRect();
-		const hz = $((idx === 0 ? 'them' : 'you') + '-hazards').getBoundingClientRect();
-		const to = { left: hz.left, width: hz.width, top: hz.top + hz.height * 0.25, height: 0 };
-		chip(from, to, String(count), big ? 'mines big' : 'mines');
+		const from = $(prefix + '-board').getBoundingClientRect();
+		const to = $((idx === 0 ? 'them' : 'you') + '-hazards').getBoundingClientRect();
+		const shot = Object.assign(document.createElement('div'), { className: 'shot' + (big === 'frost' ? ' frost' : big ? ' big' : '') });
+		document.body.appendChild(shot);
+		const x0 = from.left + from.width / 2;
+		const y0 = from.top + from.height / 2;
+		const x1 = to.left + to.width / 2;
+		const y1 = to.top + to.height * 0.3;
+		const lift = -Math.max(40, Math.abs(x1 - x0) * 0.25);
+		shot.animate(
+			[
+				{ transform: `translate(${x0}px, ${y0}px) scale(1)` },
+				{ transform: `translate(${(x0 + x1) / 2}px, ${(y0 + y1) / 2 + lift}px) scale(1.15)`, offset: 0.5 },
+				{ transform: `translate(${x1}px, ${y1}px) scale(0.6)` }
+			],
+			{ duration: 420, easing: 'cubic-bezier(.3,.6,.4,1)' }
+		).onfinish = () => shot.remove();
+		shot.style.left = '-7px';
+		shot.style.top = '-7px';
 	}
+
+	// Frost leaves from the pill: a blue shot to the other side's ice block.
 	function frostShot(idx, count) {
 		const prefix = idx === 0 ? 'you' : 'them';
 		const pill = $(prefix + '-right');
@@ -649,13 +657,40 @@
 		void pill.offsetWidth;
 		pill.classList.add('fired');
 		if (REDUCED) return;
-		const to = $((idx === 0 ? 'them' : 'you') + '-hazards').lastElementChild.getBoundingClientRect();
-		chip(pill.getBoundingClientRect(), to, `❄${count}`, 'frost', 120);
+		const from = pill.getBoundingClientRect();
+		const hz = $((idx === 0 ? 'them' : 'you') + '-hazards');
+		const to = hz.lastElementChild.getBoundingClientRect();
+		for (let k = 0; k < count; k++) {
+			const shot = Object.assign(document.createElement('div'), { className: 'shot frost' });
+			document.body.appendChild(shot);
+			const x0 = from.left + from.width / 2, y0 = from.top + from.height / 2;
+			const x1 = to.left + to.width / 2, y1 = to.top + to.height / 2;
+			const lift = -Math.max(40, Math.abs(x1 - x0) * 0.25);
+			shot.style.left = '-7px';
+			shot.style.top = '-7px';
+			shot.animate(
+				[
+					{ transform: `translate(${x0}px, ${y0}px) scale(1)` },
+					{ transform: `translate(${(x0 + x1) / 2}px, ${(y0 + y1) / 2 + lift}px) scale(1.1)`, offset: 0.5 },
+					{ transform: `translate(${x1}px, ${y1}px) scale(0.6)` }
+				],
+				{ duration: 460, delay: k * 90, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' }
+			).onfinish = () => shot.remove();
+		}
 	}
 	// Footer, what you're sending: the live clear value by your name, frost on the right.
 	function renderSend(idx, prefix) {
 		const s = match.sides[idx];
-		// No live number by the name any more: the attack shows as the flying chip.
+		const pv = match.attackPreview(idx);
+		const meter = $(prefix + '-fire');
+		let label = meter.querySelector('.val');
+		if (!label) {
+			label = Object.assign(document.createElement('span'), { className: 'val' });
+			meter.prepend(label);
+		}
+		label.textContent = `+${pv.send}`;
+		meter.classList.toggle('loaded', pv.counter > 0);
+		meter.title = pv.counter ? `Clear now: ${RULES.clearSend} + ${pv.counter} counter-spike` : `Clear now: ${pv.send} mines`;
 		const pill = $(prefix + '-right');
 		const size = RULES.frostMeter || 0;
 		pill.hidden = !size;
