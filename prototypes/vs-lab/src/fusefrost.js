@@ -16,7 +16,7 @@ export const FF_RULES = {
 
 	// Attack
 	clearSend: 4,
-	perfectSendsIce: 1,
+	perfectSendsIce: 0, // was 1; frost (below) is now the only ice your opponent sends
 	overflow: 'netCancel',
 	// Counter-spike: a clear cancels up to counterCap mines from your orange bank
 	// (never the red batch) and adds every cancelled mine to its own attack.
@@ -41,7 +41,7 @@ export const FF_RULES = {
 	passiveThawEvery: 2, // −1 every 2 moves (0.5 per move)
 	activeThaw: 2, // a placed rect sharing an edge
 	perPlacementThawCap: 2,
-	thawSendsIce: true, // ice you thaw by building is sent back
+	thawSendsIce: false, // was true; finishing ice off by building now charges frost instead
 	forceBreakSendsIce: false,
 	// Rule C (Krischan's original): mines left sitting in your orange bank start to freeze
 	// your board. Every bankFreezeEvery moves with at least bankFreezeMin mines banked,
@@ -50,6 +50,20 @@ export const FF_RULES = {
 	// spilling to the nearest cells, so one big box can defuse a clump. Reads the
 	// solution on purpose: Krischan, 2026-10-30, a hint that rewards intuition is fine.
 	mineCluster: true,
+	// Grace (Krischan, 2026-10-30): nothing lands on the clearing move or on your first
+	// move on the fresh board, so you can read it and plan a route before the batch drops.
+	clearGrace: 1,
+	// Frost: the one ice source from your opponent, and you can watch it fill.
+	// Points per ice; early defuse (fuse not on its last tick) +1; finishing ice off
+	// by building next to it +2. Fires the moment it's full, except on your last
+	// frostHoldAtBoxesLeft boxes, where it holds and fires with your clear.
+	frostMeter: 4, // 0 = off
+	frostEarlyDefuse: 1,
+	frostActiveThaw: 2,
+	frostHoldAtBoxesLeft: 4,
+	frostMaxHeld: 12, // 3 ice: one clear alone can never freeze someone over
+	// Clutch: a mine covered on its very last tick cancels this many of your own incoming.
+	clutchCancels: 1,
 	// Defuse-clear: each mine defused by the box that finishes the board adds this many
 	// mines to the clear's attack. Flat, never a multiplier (counter-spikes are big already).
 	defuseClearBonus: 1,
@@ -69,6 +83,7 @@ export const FF_RULES = {
 	// Heal: +1 heart after healPerfectBoards perfect clears in a row (0 = off).
 	// A non-perfect clear resets the run; explosions don't count against perfect.
 	healPerfectBoards: 4, // was 3
+	healCheckpoint: 2, // a non-perfect clear drops the run back to this, not to 0, once reached (0 = off)
 	maxHealsPerRound: 1, // 0 = unlimited; stops a low-heart player from chaining heals
 	// Older idea, off: +1 heart every N placements in a row without a do-over.
 	healEvery: 0,
@@ -105,6 +120,8 @@ export class FFPlayer {
 		this.heals = 0;
 		this._bankCold = 0;
 		this._defusedThisMove = 0;
+		this.frost = 0;
+		this.graceLeft = 0;
 		this.outMines = 0;
 		this.outIce = 0;
 		this.spill = 0; // icebroken cells waiting for your next board
@@ -237,6 +254,41 @@ export class FFPlayer {
 		return start - left;
 	}
 
+	/** Cancel from anywhere in your queue: orange bank first, then the red batch. */
+	cancelAny(count) {
+		let done = this.cancelIncoming(count);
+		let left = count - done;
+		const take = Math.min(left, this.pool);
+		this.pool -= take;
+		left -= take;
+		for (const p of this.incoming) {
+			if (left <= 0) break;
+			const t = Math.min(left, p.count);
+			p.count -= t;
+			left -= t;
+		}
+		this.incoming = this.incoming.filter((p) => p.count > 0);
+		return count - left;
+	}
+
+	/** Frost settles after each move: fires when full, or holds near the end of a board. */
+	frostHeld(boxesLeft) {
+		return !!this.rules.frostHoldAtBoxesLeft && boxesLeft <= this.rules.frostHoldAtBoxesLeft;
+	}
+	settleFrost(boxesLeft, cleared) {
+		const r = this.rules;
+		if (!r.frostMeter) return [];
+		let count = 0;
+		if (cleared || !this.frostHeld(boxesLeft)) {
+			count = Math.floor(this.frost / r.frostMeter);
+			this.frost -= count * r.frostMeter;
+		} else this.frost = Math.min(this.frost, r.frostMaxHeld);
+		if (!count) return [];
+		this.outIce += count;
+		this.stats.sentIce += count;
+		return [{ kind: 'frostFire', count, withClear: !!cleared }];
+	}
+
 	/** New board: re-aim telegraphed ice at cells that exist on it. */
 	retargetIce(free) {
 		for (const w of this.iceIncoming) w.target = -1;
@@ -263,7 +315,10 @@ export class FFPlayer {
 		for (let i = this.mines.length - 1; i >= 0; i--) {
 			if (!covered.has(this.mines[i].cell)) continue;
 			// Clutch: covered on its very last fuse tick (it would have gone off this move).
-			ev.push({ kind: 'defuse', cell: this.mines[i].cell, clutch: this.mines[i].fuse === 1 });
+			const clutch = this.mines[i].fuse === 1;
+			ev.push({ kind: 'defuse', cell: this.mines[i].cell, clutch });
+			if (clutch && r.clutchCancels) ev.push({ kind: 'clutch', cell: this.mines[i].cell, cancelled: this.cancelAny(r.clutchCancels) });
+			else if (!clutch && r.frostMeter) this.frost += r.frostEarlyDefuse;
 			this._defusedThisMove++;
 			this.mines.splice(i, 1);
 			this.stats.defused++;
@@ -281,6 +336,7 @@ export class FFPlayer {
 					this.outIce++;
 					this.stats.sentIce++;
 				}
+				if (r.frostMeter) this.frost += r.frostActiveThaw;
 				ev.push({ kind: 'thaw', cell: f.cell, source: 'active', sends });
 			} else ev.push({ kind: 'thawPulse', cell: f.cell, thaw: f.thaw });
 		}
@@ -306,7 +362,9 @@ export class FFPlayer {
 		}
 		this.stats.clears++;
 		const ev = [];
-		this.perfectRun = perfect ? this.perfectRun + 1 : 0;
+		const cp = r.healCheckpoint || 0;
+		this.perfectRun = perfect ? this.perfectRun + 1 : cp && this.perfectRun >= cp ? cp : 0;
+		this.graceLeft = r.clearGrace ? r.clearGrace + 1 : 0; // the clearing move's tick + your first move
 		const healsLeft = !r.maxHealsPerRound || this.heals < r.maxHealsPerRound;
 		if (r.healPerfectBoards && healsLeft && this.perfectRun >= r.healPerfectBoards) {
 			this.perfectRun = 0;
@@ -376,10 +434,12 @@ export class FFPlayer {
 		}
 
 		// 3) Mines in flight → pool → board (Tetris: lands when you move)
+		const grace = this.graceLeft > 0;
+		if (grace) this.graceLeft--;
 		for (const p of this.incoming) p.eta--;
 		for (const p of this.incoming.filter((q) => q.eta <= 0)) this.pool += p.count;
 		this.incoming = this.incoming.filter((q) => q.eta > 0);
-		if (this.pool > 0) {
+		if (this.pool > 0 && !grace) {
 			const room = Math.max(0, r.mineCap - this.mines.length);
 			let n = Math.min(this.pool, room, r.batchSize);
 			const usedRegions = new Set(this.mines.map((m) => regionOf?.[m.cell]));
@@ -420,6 +480,10 @@ export class FFPlayer {
 		for (const w of this.iceIncoming) w.eta--;
 		for (const w of [...this.iceIncoming]) {
 			if (w.eta > 0) continue;
+			if (grace) {
+				w.eta = 0;
+				continue;
+			}
 			const occ = new Set([...this.mines.map((m) => m.cell), ...this.ice.map((f) => f.cell)]);
 			let cell = w.target;
 			if (cell < 0 || !free.includes(cell) || occ.has(cell)) {

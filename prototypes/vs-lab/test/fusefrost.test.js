@@ -66,8 +66,8 @@ test('ice: telegraphed target (toggle on), lands after iceEta moves, never on cl
 	assert.equal(e.ice[0].cell, target);
 });
 
-test('thaw: adjacent placement −2, thaw-out sends 1 ice back; passive −1 per 2 moves sends nothing', () => {
-	const e = p();
+test('thaw (old rules, thawSendsIce): adjacent placement −2, thaw-out sends 1 ice back; passive −1 per 2 moves sends nothing', () => {
+	const e = p({ thawSendsIce: true, frostMeter: 0 });
 	e.ice = [{ cell: 6, thaw: 2, seq: 0, landedTick: -1 }];
 	const ev = e.onPlacement([0], [6, 1]);
 	assert.ok(kinds(ev).includes('thaw'));
@@ -81,8 +81,8 @@ test('thaw: adjacent placement −2, thaw-out sends 1 ice back; passive −1 per
 	assert.equal(e.outIce, 0);
 });
 
-test('perfect clear sends 4 mines + 1 ice; a do-over makes it 4 mines only', () => {
-	const e = p();
+test('perfect clear (old rules, perfectSendsIce 1) sends 4 mines + 1 ice; a do-over makes it 4 mines only', () => {
+	const e = p({ perfectSendsIce: 1 });
 	e.onBoardCleared();
 	assert.deepEqual(e.drainOut(), { mines: 4, ice: 1 });
 	e.onErase();
@@ -164,8 +164,8 @@ test('clear: with clearWipesPool on, pooled mines die with the board; in-flight 
 	assert.equal(w.incomingTotal, 0);
 });
 
-test('heal: 3 perfect boards in a row heals 1 heart; a sloppy clear resets the run', () => {
-	const e = p({ healPerfectBoards: 3 });
+test('heal: 3 perfect boards in a row heals 1 heart; a sloppy clear resets the run (no checkpoint)', () => {
+	const e = p({ healPerfectBoards: 3, healCheckpoint: 0 });
 	e.hearts = 1;
 	e.onBoardCleared();
 	e.onBoardCleared();
@@ -337,4 +337,71 @@ test('defuse-clear: mines defused by the clearing box add to the attack; clutch 
 	const clear = e.onBoardCleared()[0];
 	assert.equal(clear.defuseBonus, 2);
 	assert.equal(clear.sendMines, e.rules.clearSend + 2);
+});
+
+test('frost: early defuses charge it, it fires when full, holds on the last 4 boxes and fires with the clear', () => {
+	const e = p();
+	e.mines = [0, 1, 2, 3].map((cell) => ({ cell, fuse: 3 }));
+	e.onPlacement([0, 1, 2, 3], []);
+	assert.equal(e.frost, 4);
+	assert.deepEqual(e.settleFrost(5, false), [{ kind: 'frostFire', count: 1, withClear: false }]);
+	assert.equal(e.frost, 0);
+	e.frost = 7;
+	assert.deepEqual(e.settleFrost(3, false), []); // held
+	assert.equal(e.frost, 7);
+	assert.deepEqual(e.settleFrost(0, true), [{ kind: 'frostFire', count: 1, withClear: true }]);
+	assert.equal(e.frost, 3);
+	e.frost = 30;
+	e.settleFrost(2, false);
+	assert.equal(e.frost, 12); // capped while held: 3 ice at most
+});
+
+test('frost: finishing ice off by building charges +2 and sends nothing directly', () => {
+	const e = p();
+	e.ice = [{ cell: 6, thaw: 2, seq: 0, landedTick: -1 }];
+	e.onPlacement([0], [6]);
+	assert.equal(e.frost, 2);
+	assert.equal(e.drainOut().ice, 0);
+});
+
+test('clutch: a mine covered on its last tick cancels one incoming, from the red batch if the bank is empty', () => {
+	const e = p();
+	e.incoming = [{ count: 3, eta: 1 }];
+	e.mines = [{ cell: 0, fuse: 1 }];
+	const ev = e.onPlacement([0], []);
+	assert.deepEqual(ev.find((x) => x.kind === 'clutch'), { kind: 'clutch', cell: 0, cancelled: 1 });
+	assert.equal(e.incomingTotal, 2);
+	assert.equal(e.frost, 0); // clutch is defense, not frost
+});
+
+test('grace: nothing lands on the clearing move or the first move of the new board', () => {
+	const e = p();
+	e.pool = 6;
+	e.iceIncoming = [{ eta: 1, target: -1 }];
+	e.onBoardCleared();
+	e.pool = 6; // the red batch survives the clear
+	e.iceIncoming = [{ eta: 1, target: -1 }];
+	e.tick(FREE); // the clearing move's tick
+	e.tick(FREE); // first move on the new board
+	assert.equal(e.mines.length, 0);
+	assert.equal(e.ice.length, 0);
+	e.tick(FREE); // second move: it all drops
+	assert.equal(e.mines.length, 6);
+	assert.equal(e.ice.length, 1);
+});
+
+test('heal checkpoint: after 2 perfect boards a sloppy clear drops the run to 2, not 0', () => {
+	const e = p();
+	e.onBoardCleared();
+	e.onBoardCleared();
+	e.onBoardCleared();
+	assert.equal(e.perfectRun, 3);
+	e.onErase();
+	e.onBoardCleared();
+	assert.equal(e.perfectRun, 2);
+	const f = p();
+	f.onBoardCleared();
+	f.onErase();
+	f.onBoardCleared();
+	assert.equal(f.perfectRun, 0);
 });

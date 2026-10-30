@@ -22,6 +22,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 - There is no wall clock. Each player's board ticks once per move: a placement or an erase. Tapping an empty cell is not a move. Moves come roughly every 1.5 to 1.8 seconds in real play.
 - Incoming mines and ice land when you move (Tetris-style), so a player who stops to think gets a short grace.
 - **Idle tick: tried and dropped (2026-10-30).** A 4-second idle tick was built; Krischan didn't like it in play, so it's off (still a lab slider). Stalling only delays your own landings while the opponent keeps clearing; a real match still needs an AFK timeout on the server.
+- **Grace after a clear (2026-10-30, Krischan):** nothing lands, mines or ice, on the clearing move or on your first move on the fresh board. The red batch drops on your second move, so you get one look to plan your route.
 - A move resolves in order: your box goes down (defusing what it covers, thawing ice beside it); if that finished the board, your attack goes out and cancels mines still flying at you; then your board ticks.
 
 ## Mines
@@ -33,7 +34,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 | Landing | Up to 6 per move (was 4), on empty non-clue cells, **clustered** (2026-10-30): the batch fills one unsolved box, picked weighted by its open cells squared, then the nearest open cells. It hints at the solution on purpose ([ideas](../prototypes/vs-lab/PARKED.md#2-mines-land-in-clusters-built-minecluster)). |
 | Live mines on a board | At most 6; the rest wait in a pool and drop in as room frees up |
 | Fuse | 3 of your moves |
-| Defuse | Cover the mine with a placed box. Covering it on its last fuse tick is a **clutch** (a callout, no bonus). |
+| Defuse | Cover the mine with a placed box. **Early** (before its last tick): +1 frost. **Clutch** (on its last tick): cancels 1 of your own incoming mines, orange first, then red (2026-10-30). |
 | Defuse clear | Each mine defused by the box that finishes the board adds +1 to that clear's attack (2026-10-30). |
 | Explosion | −1 heart, and every box touching the 3×3 blast is removed. Mines that go off on the same move cost **one heart in total** (anti-burst, 2026-10-30); each still blasts. |
 | Your board clears | Its live mines die with it. The red batch is committed and lands on your next board; the orange bank is what your counter-spike eats. |
@@ -46,7 +47,7 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 
 | Rule | Value |
 | --- | --- |
-| Sources | **Rule C (2026-10-30, Krischan's original rule):** 4 or more mines sitting in your orange bank for 6 of your moves in a row queue 1 ice on your own board, and again every 6 moves after. It's the price of holding your last box for a bigger counter-spike, and the ice source every player meets, not only those who clear perfectly. Also: a perfect clear (no erase or overwrite on that board) sends 1 ice, and ice your opponent thaws by building comes back to you. |
+| Sources | **Frost (2026-10-30) is the only ice your opponent sends.** Each player has a frost meter, a 4-segment blue pill at the right of the footer. Early defuses charge it +1 and finishing ice off by building next to it +2. When full it fires 1 ice at the opponent, as a blue shot. On your last 4 boxes it holds instead (outlined), stacking up to 3 ice, and fires with your clear. Perfect clears and thawing no longer send ice. Your own ice can still come from **rule C (2026-10-30, Krischan's original rule):** 4 or more mines sitting in your orange bank for 6 of your moves in a row queue 1 ice on your own board, and again every 6 moves after. It's the price of holding your last box for a bigger counter-spike. Icebreaker spill also returns on your next board. |
 | On the way | Lands **2** of your moves after it's sent, on a random empty non-clue cell. No cap: ice stacks if the opponent is cracked. No landing cell is marked; the board catches a chill (blue frost, drifting snow) and the ice block on the hazard bar blinks. |
 | Effect | Refuses boxes. A board cannot be finished while ice is on it. |
 | Thaw points | 4, shown as a growing dark wedge |
@@ -60,11 +61,14 @@ Two verbs (cover mines, build next to ice) and one thing to watch (hearts). One-
 - 3 hearts per round.
 - **KO:** out of hearts, or 4 ice on your board at once (**freeze-over**). Ice still on its way doesn't count until it lands, and several can land on one move.
 - A KO ends the round and **fully resets both players**, winner included, so nobody snowballs. First to 7 rounds.
-- **Heal:** 4 perfect boards in a row (was 3) heals 1 heart, up to 3, **once per round**. A non-perfect clear resets the count; a mine going off doesn't spoil a perfect board. On the hearts pole the healing heart beats while the current board can still be perfect, and flatlines and drains the moment you erase or overwrite a box.
+- **Heal:** 4 perfect boards in a row (was 3) heals 1 heart, up to 3, **once per round**. **Checkpoint at 2** (2026-10-30): once you have 2, a non-perfect clear drops you back to 2, not 0 (a notch on the heart); before that it resets the count; a mine going off doesn't spoil a perfect board. On the hearts pole the healing heart beats while the current board can still be perfect, and flatlines and drains the moment you erase or overwrite a box.
 - **Rush:** after 100 moves (average of both players; was 150), every mine attack is worth 5 times as much. It guarantees every round ends.
 - Boards: 6×6 Classic, both players race the same seeded sequence at their own pace.
 
 ## The frame (2026-10-30)
+
+**Footer, updated later that day:** time on the left; your name with a **live `+N`**, what your clear would send right now (base 4 plus whatever the counter-spike would cancel, with rush), bright when it would counter-spike; the **frost pill** on the right. The opponent's footer shows their `+N` too, so you can see when they're loaded. Left pole is you, right bar is what's coming at you, the footer is what you're sending.
+
 
 Krischan's layout, TETR.IO-clean and symmetrical: **left pole = you, right pole = what's coming at you.**
 

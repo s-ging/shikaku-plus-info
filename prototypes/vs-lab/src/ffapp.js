@@ -433,6 +433,8 @@
 			case 'heal': return e.boards ? (e.healed ? `${e.boards} perfect boards in a row: healed a heart` : `${e.boards} perfect boards in a row (hearts already full)`) : e.healed ? `${e.streak}x streak: healed a heart` : `${e.streak}x streak (hearts already full)`;
 			case 'send': return e.counter ? `counter-spike: cancelled ${e.cancelled}, sent ${e.pass}${e.rush ? ' (rush)' : ''}` : e.cancelled ? `attack ${e.count}${e.rush ? ' (rush)' : ''}: cancelled ${e.cancelled} incoming, ${e.pass} sent` : `sent ${e.count} mines${e.rush ? ' (rush)' : ''}`;
 			case 'sendIce': return `sent ${e.count} ice`;
+			case 'frostFire': return `frost fired: ${e.count} ice${e.withClear ? ', with the clear' : ''}`;
+			case 'clutch': return e.cancelled ? `clutch: cancelled ${e.cancelled} incoming` : 'clutch (nothing incoming to cancel)';
 			case 'bankFreeze': return `bank of ${e.bank} sat too long: ice on the way`;
 			case 'ko': return e.by === 'ice' ? 'frozen over' : 'out of hearts';
 			default: return null;
@@ -452,7 +454,6 @@
 				else if (e.kind === 'frozen') v.flash('pulse', e.cell);
 				else if (e.kind === 'defuse') {
 					v.flash('ring', e.cell);
-					if (e.clutch) callout(v, 'CLUTCH');
 				}
 				else if (e.kind === 'forceBreak') v.flash('shatter', e.cell, 1);
 				else if (e.kind === 'thaw') v.flash('shatter', e.cell, 0.3);
@@ -460,6 +461,8 @@
 			if (e.kind === 'clear' && e.defuseBonus && v) callout(v, `DEFUSE CLEAR +${e.defuseBonus}`);
 			if (e.kind === 'heal' && e.healed) pulseHearts(e.side);
 			if (e.kind === 'send' && e.pass > 0) fire(e.side === 'you' ? 0 : 1, e.pass, !!e.counter);
+			if (e.kind === 'frostFire') frostShot(e.side === 'you' ? 0 : 1, e.count);
+			if (e.kind === 'clutch' && v) callout(v, e.cancelled ? `CLUTCH −${e.cancelled}` : 'CLUTCH');
 			if (e.kind === 'frozen') iceFlashUntil[e.side === 'you' ? 0 : 1] = performance.now() + 260;
 			if (e.kind === 'roundOver') showRoundOver(e);
 			const text = describe(e);
@@ -533,6 +536,7 @@
 		for (let i = 0; i < RULES.hearts; i++) {
 			const seg = document.createElement('i');
 			seg.appendChild(Object.assign(document.createElement('span'), { className: 'fill' }));
+			seg.appendChild(Object.assign(document.createElement('span'), { className: 'notch' }));
 			lives.appendChild(seg);
 		}
 		const hz = $(prefix + '-hazards');
@@ -557,9 +561,16 @@
 			seg.className = alive ? 'on' : '';
 			const fill = seg.firstChild;
 			// The beat stops (and the fill drains) the moment this board can't be perfect.
-			const healing = !alive && i === e.hearts && canHeal && e.perfectRun > 0 && e.doOversThisBoard === 0;
-			fill.style.height = healing ? `${(100 * e.perfectRun) / RULES.healPerfectBoards}%` : '0';
-			if (healing) seg.classList.add('healing');
+			// The healable heart: it beats while this board can still be perfect. A redo
+			// flatlines it and the fill drops back to the checkpoint notch (or to empty).
+			const healable = !alive && i === e.hearts && canHeal;
+			const cp = RULES.healCheckpoint || 0;
+			const shown = e.doOversThisBoard ? (cp && e.perfectRun >= cp ? cp : 0) : e.perfectRun;
+			fill.style.height = healable ? `${(100 * shown) / RULES.healPerfectBoards}%` : '0';
+			const notch = seg.children[1];
+			notch.style.bottom = `${(100 * cp) / RULES.healPerfectBoards}%`;
+			if (healable && cp) seg.classList.add('healable');
+			if (healable && e.perfectRun > 0 && !e.doOversThisBoard) seg.classList.add('healing');
 		});
 		// Hazards, top to bottom: orange bank, red next batch, one ice block.
 		const kids = [...hz.children];
@@ -584,14 +595,13 @@
 	function fire(idx, count, big) {
 		const prefix = idx === 0 ? 'you' : 'them';
 		const meter = $(prefix + '-fire');
-		meter.textContent = `+${count}`;
 		const pop = Object.assign(document.createElement('span'), { className: 'pop' + (big ? ' big' : ''), textContent: `+${count}` });
 		meter.appendChild(pop);
 		setTimeout(() => pop.remove(), 950);
 		if (REDUCED) return;
 		const from = $(prefix + '-board').getBoundingClientRect();
 		const to = $((idx === 0 ? 'them' : 'you') + '-hazards').getBoundingClientRect();
-		const shot = Object.assign(document.createElement('div'), { className: 'shot' + (big ? ' big' : '') });
+		const shot = Object.assign(document.createElement('div'), { className: 'shot' + (big === 'frost' ? ' frost' : big ? ' big' : '') });
 		document.body.appendChild(shot);
 		const x0 = from.left + from.width / 2;
 		const y0 = from.top + from.height / 2;
@@ -610,6 +620,68 @@
 		shot.style.top = '-7px';
 	}
 
+	// Frost leaves from the pill: a blue shot to the other side's ice block.
+	function frostShot(idx, count) {
+		const prefix = idx === 0 ? 'you' : 'them';
+		const pill = $(prefix + '-right');
+		pill.classList.remove('fired');
+		void pill.offsetWidth;
+		pill.classList.add('fired');
+		if (REDUCED) return;
+		const from = pill.getBoundingClientRect();
+		const hz = $((idx === 0 ? 'them' : 'you') + '-hazards');
+		const to = hz.lastElementChild.getBoundingClientRect();
+		for (let k = 0; k < count; k++) {
+			const shot = Object.assign(document.createElement('div'), { className: 'shot frost' });
+			document.body.appendChild(shot);
+			const x0 = from.left + from.width / 2, y0 = from.top + from.height / 2;
+			const x1 = to.left + to.width / 2, y1 = to.top + to.height / 2;
+			const lift = -Math.max(40, Math.abs(x1 - x0) * 0.25);
+			shot.style.left = '-7px';
+			shot.style.top = '-7px';
+			shot.animate(
+				[
+					{ transform: `translate(${x0}px, ${y0}px) scale(1)` },
+					{ transform: `translate(${(x0 + x1) / 2}px, ${(y0 + y1) / 2 + lift}px) scale(1.1)`, offset: 0.5 },
+					{ transform: `translate(${x1}px, ${y1}px) scale(0.6)` }
+				],
+				{ duration: 460, delay: k * 90, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' }
+			).onfinish = () => shot.remove();
+		}
+	}
+	// Footer, what you're sending: the live clear value by your name, frost on the right.
+	function renderSend(idx, prefix) {
+		const s = match.sides[idx];
+		const pv = match.attackPreview(idx);
+		const meter = $(prefix + '-fire');
+		let label = meter.querySelector('.val');
+		if (!label) {
+			label = Object.assign(document.createElement('span'), { className: 'val' });
+			meter.prepend(label);
+		}
+		label.textContent = `+${pv.send}`;
+		meter.classList.toggle('loaded', pv.counter > 0);
+		meter.title = pv.counter ? `Clear now: ${RULES.clearSend} + ${pv.counter} counter-spike` : `Clear now: ${pv.send} mines`;
+		const pill = $(prefix + '-right');
+		const size = RULES.frostMeter || 0;
+		pill.hidden = !size;
+		if (!size) return;
+		if (Number(pill.dataset.size) !== size) {
+			pill.innerHTML = '';
+			for (let k = 0; k < size; k++) pill.appendChild(document.createElement('i'));
+			pill.appendChild(Object.assign(document.createElement('b'), { className: 'stack' }));
+			pill.dataset.size = size;
+		}
+		const e = s.econ;
+		const full = Math.floor(e.frost / size);
+		const part = e.frost % size;
+		const segs = [...pill.querySelectorAll('i')];
+		segs.forEach((seg, k) => seg.classList.toggle('on', full > 0 || k < part));
+		pill.querySelector('.stack').textContent = full > 1 ? `×${full}` : '';
+		const left = s.puzzle.layout.length - s.rects.filter((r) => s.puzzle.layout.some((l) => l.x1 === r.x1 && l.y1 === r.y1 && l.x2 === r.x2 && l.y2 === r.y2)).length;
+		pill.classList.toggle('held', e.frostHeld(left));
+		pill.title = e.frostHeld(left) ? 'Frost is held: it fires with your clear' : `Frost ${e.frost % size}/${size}: fires when full`;
+	}
 	function renderHud() {
 		if (!match) return;
 		const [you, them] = match.sides;
@@ -617,8 +689,8 @@
 		$('score-them').textContent = match.score[1];
 		renderPoles(0, 'you');
 		renderPoles(1, 'them');
-		$('you-right').textContent = '';
-		$('them-right').textContent = '';
+		renderSend(0, 'you');
+		renderSend(1, 'them');
 		$('them-left').textContent = `Board ${them.boardIndex + 1}`;
 		$('mode-line').textContent = `6×6 · Classic · FT${match.target}${match.rush ? ` · Rush ×${RULES.rushMultiplier}` : ''}`;
 	}
@@ -758,6 +830,10 @@
 			{ k: 'maxHealsPerRound', label: 'Max heals per round', min: 0, max: 5, step: 1, fmt: (v) => (v ? String(v) : 'no limit') },
 			{ k: 'rushAfter', label: 'Rush after (moves)', min: 0, max: 300, step: 10, fmt: (v) => (v ? String(v) : 'off') },
 			{ k: 'rushMultiplier', label: 'Rush multiplier', min: 2, max: 20, step: 1, fmt: (v) => `×${v}` },
+			{ k: 'clearGrace', label: 'Grace after a clear', min: 0, max: 3, step: 1, fmt: (v) => (v ? `${v} move${v > 1 ? 's' : ''}` : 'off') },
+			{ k: 'frostMeter', label: 'Frost meter size', min: 0, max: 8, step: 1, fmt: (v) => (v ? `${v} pts = 1 ice` : 'off') },
+			{ k: 'frostHoldAtBoxesLeft', label: 'Frost holds on last N boxes', min: 0, max: 8, step: 1, fmt: (v) => (v ? String(v) : 'never') },
+			{ k: 'healCheckpoint', label: 'Heal checkpoint', min: 0, max: 4, step: 1, fmt: (v) => (v ? `at ${v}` : 'off') },
 			{ k: 'mineCluster', label: 'Mine landing', options: [['true', 'Clustered in the biggest open box'], ['false', 'Scattered']] },
 			{ k: 'defuseClearBonus', label: 'Defuse clear bonus', min: 0, max: 3, step: 1, fmt: (v) => (v ? `+${v} per mine` : 'off') },
 			{ k: 'counterSpike', label: 'Counter', options: [['true', 'Counter-spike (cancel bank, send it back)'], ['refund', 'Refund (attack cancels, half comes back)'], ['false', 'Plain net-cancel']] },

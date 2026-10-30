@@ -116,7 +116,8 @@ export class FFMatch {
 		tag(s, a.events);
 
 		// Clear resolves before the tick, so its attack cancels incoming first.
-		if (isSolved(s.rects, s.N)) {
+		const cleared = isSolved(s.rects, s.N);
+		if (cleared) {
 			tag(s, s.econ.onBoardCleared());
 			s.cleared++;
 			s.boardIndex++;
@@ -128,9 +129,19 @@ export class FFMatch {
 			}
 			out.push({ side: s.name, kind: 'newBoard', index: s.boardIndex });
 		}
+		tag(s, s.econ.settleFrost(unplacedGivens(s.board()).length, cleared));
 		this._route(s, opp, out);
 		this._tickSide(s, opp, tag, out);
 		return { moved: true, events: out, placed: a.placed };
+	}
+
+	/** What side i's clear would send right now (base, counter-spike, rush). */
+	attackPreview(i) {
+		const s = this.sides[i];
+		const r = this.rules;
+		const base = r.clearSend * (this.rush ? r.rushMultiplier : 1);
+		const cancel = r.counterSpike === true ? Math.min(s.econ.bank, r.counterCap) : 0;
+		return { send: base + Math.floor(cancel * (r.counterRate ?? 1)), counter: cancel };
 	}
 
 	/** One clock step for side i without a move: the idle tick that stops stalling. */

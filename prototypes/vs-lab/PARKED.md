@@ -52,6 +52,35 @@ Covering a mine on its very last fuse tick, the move it would have gone off. Kri
 
 **Can the game read it, and is it expensive?** It's free. Each mine already carries its `fuse` count, and `FFPlayer.onPlacement` already loops over the mines a placement covers. A clutch is a defused mine with `fuse === 1`: one comparison per defused mine, with no search and no solver. It's a flag on the existing event, `{ kind: 'defuse', cell, clutch: true }`, so a match server can read it the same way.
 
+## 6. Frost, grace, clutch, checkpoint, live attack (built, 2026-10-30 afternoon)
+
+From Krischan's car play-test. His findings:
+
+- **The meta he found:** "isolate or prioritize the lower numbers in the board or you're FUCKED". A mine on a 2 costs a move per mine; a big box sweeps several. With clustering, clearing the small ones first makes the big boxes where mines land: you herd mines into them.
+- **The cornerstone:** "easy to pick up, easy to 'get good at' for comeback points, but hard to totally master. Just like Tetris." No rulebook, no Valorant-style study.
+- **Ice was unreadable:** "I'm surprised when I get iced because I don't know how they form or where they come from or how many are coming." Four invisible sources (opponent perfect clears, thaw sent back, rule C, spill).
+- **Mines sent were unreadable too:** "I don't know how much mines I'm sending or how powerful my attacks actually are."
+
+What was built (all lab sliders):
+
+- **Grace after a clear** (`clearGrace` 1): nothing lands on the clearing move or your first move on the new board. Krischan: "a cooldown of 1 turn before bombing the whole ass board", to get "a feel of your pathing/routing".
+- **Frost meter** (`frostMeter` 4): the only ice your opponent sends.
+  - **Charging:** early defuse +1; finishing ice off by building +2. Krischan suggested the icebreaker for the +2; Claude moved it to active thaw, because the icebreaker is automatic and would reward getting iced.
+  - **Firing:** fires on full, but holds on your last 4 boxes (`frostHoldAtBoxesLeft`) and fires with the clear, stacking up to 3 ice (`frostMaxHeld` 12), below freeze-over at 4. Krischan: "in the events when you need to send pressure or deflect pressure you'd just roll for initiative". Playstyle is chosen by when you defuse: early for a stride drip, late for a spike.
+  - **Shown:** as a segmented pill on the right of the footer (Krischan: "it's a bar, it's a meter"), outlined when held.
+- **Clutch cancels 1** (`clutchCancels`): defense for a late defuse ("damage control"), offense (frost) for an early one. This also fixes the CLUTCH false positive: it now always does something.
+- **Heal checkpoint at 2** (`healCheckpoint`): "Maybe checkpoint at the midpoint so there's some stakes still because I like its challenge". Drawn as a notch on the healing heart.
+- **Live attack preview:** the `+N` by your name shows what your clear would send right now, bright when it would counter-spike. The opponent's is visible too (scouting).
+- **Turned off, replaced by frost:** `perfectSendsIce` 0, `thawSendsIce` false.
+
+**Simulation** (strong human stand-in vs each preset): ice now ends 33–46% of rounds against Normal and up (it was 10–35%), so ice is a real threat at last. Impossible fell from 94% to 70% bot wins: the stand-in now sends frost too. Re-tune Impossible if it feels soft.
+
+**Still open:**
+
+- **Meter size:** 3 or 4 (Krischan unsure).
+- **Combos** (defuse streaks, a defuse plus a thaw in one move): talked through, not built.
+- **Showing the opponent's `+N`:** is it good tension or too much information?
+
 ## The lockout fix (built)
 
 On 2026-10-30, three ice on the last two boxes left Krischan with no legal box, because the icebreaker breaks only one cell per move. It now keeps breaking until a legal box exists (test: "icebreaker never leaves you with no legal box"). Claude fixed it before asking, though Krischan had said "talk to me"; he then said to go ahead with the changes.
